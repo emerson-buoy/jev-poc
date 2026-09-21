@@ -5,6 +5,12 @@ Project guidance for the Jev triage board monorepo. The global
 its critical rules (no em-dash character U+2014, no generated-by lines, answer
 questions without changing code, the user commits manually).
 
+## Read first
+
+`docs/context.md` holds the full context: history, every decision with its
+reason, provider wire formats, alternatives rejected, verified state and
+operational gotchas. Read it before changing scope or providers.
+
 ## What this is
 
 A Kanban board (`apps/web`, TanStack Start) backed by a FastAPI service
@@ -95,7 +101,7 @@ A Kanban board (`apps/web`, TanStack Start) backed by a FastAPI service
   does work for manual verification.
 - Stopping dev servers: `fastapi dev` runs a reloader whose children have
   `multiprocessing` command lines, so a `pkill` on the fastapi pattern leaves
-  them bound to 8000. Kill `jev-poc/apps/api/.venv/bin/python` processes too,
+  them bound to 8000. Kill `jev-ticket-classifier/apps/api/.venv/bin/python` processes too,
   then confirm both ports bind with a socket test before starting again. A
   leftover server with its SQLite file deleted answers reads and returns 500
   on writes, which looks like an application bug.

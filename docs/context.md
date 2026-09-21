@@ -1,0 +1,164 @@
+# Project context
+
+Everything a new engineer or agent needs that is not obvious from the code.
+Written 2026-09-21 at the end of the first build day. `CLAUDE.md` holds the
+rules; this file holds the story, the facts and the reasoning.
+
+## What this is
+
+A Kanban board for support tickets where TypeSafe AI's Jev decides the
+department, the urgency and whether a refund is requested. Jev is a
+"System One" evaluation model: it takes typed questions against a piece of
+state and returns calibrated probability distributions, not text. The board
+makes those decisions visible as badges and, in the detail panel, as
+probability bars with per-question confidence.
+
+Owner: Emerson Demetrio. Repo: github.com/emerson-buoy/jev-ticket-classifier.
+
+## History
+
+1. **NestJS CLI (commit `5c3de9f`).** Built from a written spec
+   (`docs/original-spec.md`): a TypeScript CLI calling Jev through the AI SDK's
+   `experimental_evaluate` via Vercel AI Gateway. Ports and adapters in the
+   Nest IoC container, 33 Vitest tests. Never ran live: no gateway key.
+2. **Rescope to a board (commit `e99bafe`).** Same day, Emerson rescoped to a
+   monorepo: TanStack Start UI plus FastAPI backend. The Nest code was deleted
+   from the tree and lives only in history.
+3. **History and TypeSafe provider (commit `59878c9`).** Moving a card back to
+   New archives its triage. A direct TypeSafe adapter was added once Emerson
+   said he had a TypeSafe account, and Jev was verified live through it.
+4. **Rename.** Repo and folder renamed from `jev-poc` to
+   `jev-ticket-classifier`. Package names and UI titles still say "Jev Triage
+   Board" and were left as is on purpose.
+
+## Decisions and why
+
+Every decision below came from an explicit interview round with Emerson. If
+you want to change one, it is a product decision, not a refactor.
+
+| Decision | Chosen | Why |
+| --- | --- | --- |
+| Column axis | Workflow status: New, Triaged, In progress, Done | Emerson chose status over department columns; department, urgency and refund are badges |
+| Framework | TanStack Start (not a Vite SPA) | He wanted the full TanStack experience; server functions are the only client of the API |
+| Data path | Browser to TanStack Query to Start server functions to generated OpenAPI client to FastAPI | Keeps the API URL server-side, no CORS |
+| Monorepo tooling | pnpm workspaces plus uv, root scripts with concurrently, no Turborepo or Nx | Two apps in two languages gain little from a task graph |
+| Persistence | SQLite through SQLModel | Zero infrastructure, survives restarts |
+| Triage trigger | On first move into Triaged; auto-triage on create deferred | Emerson: "when I move to triage for now; then automatic" |
+| Triage failure | Move rejected, card snaps back, toast | A card in Triaged always has a result |
+| Move back to New | Triage discarded into history, override cleared | Emerson asked for discard with historical data kept and shown collapsed |
+| Re-triage | Archives the replaced result, clears override | Keeps history complete |
+| Seeds | Ten tickets across all columns, static fixture results marked `provider: seed` | Works with no provider, same fixtures serve tests |
+| Override | Human department override stored beside Jev's suggestion; `effective_department` = override or suggestion | Shows disagreement, which is useful demo material |
+| Detail panel | Description, probability bars, confidence, provider, override select, re-triage, delete, collapsed history | Where the probabilities become visible |
+| Mock mode | Automatic when no key, deterministic keyword heuristics, banner on the board, provider recorded on each result | Emerson had no key at first and wanted zero-config runs |
+| Python route to Jev | Plain httpx, no TypeSafe or Vercel SDK | Fewest dependencies; both endpoints are plain JSON |
+| API contract | Client generated from FastAPI's OpenAPI with `@hey-api/openapi-ts` | One source of truth in the Pydantic models |
+| Env layout | Each app owns its `.env` and `.env.example`; API also reads a repo-root `.env` | Emerson: "each app has its own" |
+| Tests | pytest with the mock adapter; Vitest plus Testing Library with server functions mocked; no Playwright | Nothing hits the network |
+| Realtime | Deferred to `TODO.md`; Query refetches on focus and after mutations | Emerson: "hmmm add to TODO" |
+
+Earlier, for the Nest CLI, he chose Nest defaults over bespoke setup and
+said "this is a POC anyway". He prefers framework conventions for POCs.
+
+## Providers and wire formats
+
+All three implement `apps/api/app/triage/port.py` and map to the same
+`TriageEvaluation`. Selection is in `factory.py`: `TRIAGE_PROVIDER=auto`
+picks `typesafe` with `TYPESAFE_API_KEY`, else `jev` with
+`AI_GATEWAY_API_KEY`, else `mock`.
+
+**typesafe** (verified live 2026-09-21)
+- `POST https://api.typesafe.ai/v1/systemone`, `Authorization: Bearer`.
+- Body: `{model: "jev-latest", state, questions}`. Yes/no questions are type
+  `noul`; `choice` criteria is a map of option to description; `score`
+  criteria is an ordered array of 2 to 10 level descriptions.
+- Answers: choice `{choice, probabilities, confidence}`; score
+  `{score, legend, probabilities, confidence}` with probabilities keyed by
+  0-based index strings and score a fractional 0-based position; noul
+  `{noul}` as P(true). Usage `{input_tokens, output_tokens}`.
+- Errors: 401, 422, 429, 529. Observed latency 0.3 to 0.7 s per ticket.
+- Live results on the sample tickets were sharp: department at 100%, refund
+  at 99% for the double charge, urgency 5/5 for the outage.
+
+**jev** (gateway, tests only)
+- `POST https://ai-gateway.vercel.sh/v1/evaluate`, `Authorization: Bearer`.
+- Body: `{model: "typesafe-ai/jev", state, questions}` with AI SDK naming:
+  `boolean`, `choice`, `score`.
+- Answers: choice `{choice, probabilities?}`; score `{score, probabilities?}`
+  keyed by 0-based index; boolean `{probability}`. Confidence, when present,
+  at `providerMetadata.typesafe.confidence`.
+- The gateway requires a Vercel team with a card on file. The AI SDK
+  (`ai` 7.0.107) types exactly one evaluation id, `typesafe-ai/jev`; its docs
+  also use `typesafe-ai/jev-latest`. Both are accepted.
+
+**mock**
+- Keyword heuristics in `mock.py`. Billing words, technical words, general
+  words; urgency from critical, pressing, moderate and relaxed phrases;
+  refund 0.92 when "refund" appears, 0.25 when negated ("not a refund"),
+  0.05 otherwise. Probabilities are synthesized around the chosen answer.
+
+**Service mapping** (`service.py`): urgency level is the 1-based argmax of
+the distribution (rounded score plus one without one); urgency mean is the
+raw score plus one; refund flag at `REFUND_THRESHOLD` 0.5; provider name and
+timestamp recorded.
+
+## Alternatives evaluated and rejected or deferred
+
+- **Anthropic key.** Claude can answer the same three questions with
+  structured outputs, but returns a decision, not a calibrated distribution.
+  Feasible as a fourth adapter; not built. Emerson asked why the app was
+  "built around Vercel": it is built around Jev, which was only reachable
+  through the gateway until his TypeSafe account came into play.
+- **Running Jev locally.** Not possible. Jev is hosted only, no public
+  weights, no self-host option. Nearest stand-in is "Jeff"
+  (github.com/logan-markewich/jeff), an MIT server speaking the same
+  `/v1/systemone` contract on a 400M parameter GLiFormer, noticeably less
+  accurate. Would need its own adapter since it speaks the TypeSafe format.
+- **Official `typesafe-sdk`** (PyPI 0.7.0) and **Vercel's Python `ai`**
+  package (0.7.0, beta). Both work; plain httpx was chosen. Beware
+  `typesafe-ai` and `typesafe` on PyPI, which are unaffiliated packages.
+
+## Verified state
+
+| Check | Status |
+| --- | --- |
+| API pytest | 50 pass, no network |
+| Web vitest | 19 pass, API mocked |
+| Ruff, ESLint, tsc, build | clean, via `./run.sh --check` |
+| Browser | board, drag into Triaged, detail panel, override, history verified in Chrome |
+| Live Jev | typesafe provider, three tickets |
+| Gateway provider | recorded responses only |
+
+## Operational gotchas
+
+- `TYPESAFE_API_KEY` lives in `apps/api/.env`. Never read or print that file.
+  Confirm behavior through `GET /meta` and the API's responses only.
+- `fastapi dev` runs a reloader whose children have `multiprocessing`
+  command lines. Killing the parent pattern leaves them bound to port 8000.
+  Kill `jev-ticket-classifier/apps/api/.venv/bin/python` processes and
+  bind-test both ports before restarting. A leftover server whose SQLite
+  file was deleted answers reads and returns 500 on writes, which looks like
+  an application bug. This bit three times in one day.
+- Chrome automation cannot perform an HTML5 drag; dispatch `DragEvent`s with
+  a `DataTransfer` on the card and the column section instead. Native drags
+  by hand work.
+- `src/routeTree.gen.ts` is generated and gitignored; run `pnpm build` or
+  `pnpm dev` before `pnpm typecheck` on a fresh clone.
+- After changing an API route or schema: `pnpm export:openapi` then
+  `pnpm generate:client`. Commit both outputs.
+- Score answers are 0-based on the wire and 1-based everywhere the UI shows
+  them.
+
+## Open items
+
+See `TODO.md`: auto-triage on create, realtime updates, gateway provider live
+check. Naming is inconsistent after the rename (package `jev-triage-board`,
+API `jev-triage-api`, UI title "Jev Triage Board") and was left deliberately.
+
+## Working with Emerson
+
+- He runs scope changes through the `grill-me` interview skill and answers
+  rounds in one line per question. Use it for anything that changes scope.
+- He wants short factual answers with a recommendation, then he decides.
+- He commits manually except when he says "push".
+- Never use the em-dash character; never add generated-by lines.

@@ -95,7 +95,9 @@ apps/
     src/lib/           Queries, board helpers, generated client
     src/components/    Board, column, card, detail panel, dialogs
     src/routes/        File-based routes
-CLAUDE.md              Design decisions and conventions for this repo
+CLAUDE.md              Rules and conventions for this repo
+docs/context.md        Full project context: history, decisions, wire formats, gotchas
+docs/original-spec.md  The spec the first version was built from
 TODO.md                Deferred work
 ```
 
