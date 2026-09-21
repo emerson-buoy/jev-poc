@@ -4,9 +4,9 @@ from app.triage.http import HttpEvaluator
 from app.triage.port import (
     BooleanAnswer,
     ChoiceAnswer,
+    MalformedResponse,
     ScoreAnswer,
     TicketContent,
-    TriageError,
     TriageEvaluation,
 )
 from app.triage.questions import QUESTIONS
@@ -49,7 +49,7 @@ def _parse(body: dict) -> TriageEvaluation:
             confidence=_confidence(body.get("providerMetadata")),
         )
     except (KeyError, TypeError, ValueError) as error:
-        raise TriageError(f"Unexpected evaluate response: {error!r}") from error
+        raise MalformedResponse(f"Unexpected evaluate response: {error!r}") from error
 
 
 def _int_keys(probabilities: dict | None) -> dict[int, float] | None:

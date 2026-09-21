@@ -1,8 +1,9 @@
 import httpx
 
-from app.triage.port import TriageError
+from app.triage.port import MalformedResponse, ProviderRejected, ProviderUnavailable
 
 REQUEST_TIMEOUT_SECONDS = 30.0
+TOO_MANY_REQUESTS = 429
 
 
 class HttpEvaluator:
@@ -21,21 +22,32 @@ class HttpEvaluator:
         try:
             response = self._client.post(self._url, json=payload)
         except httpx.HTTPError as error:
-            raise TriageError(f"Could not reach {self._label}: {error}") from error
+            raise ProviderUnavailable(f"Could not reach {self._label}: {error}") from error
         if response.is_error:
-            raise TriageError(
-                f"{self._label} returned {response.status_code}: {_error_message(response)}"
-            )
+            raise self._status_error(response)
         try:
             body = response.json()
         except ValueError as error:
-            raise TriageError(f"Unexpected {self._label} response: not JSON") from error
+            raise MalformedResponse(f"Unexpected {self._label} response: not JSON") from error
         if not isinstance(body, dict):
-            raise TriageError(f"Unexpected {self._label} response: not an object")
+            raise MalformedResponse(f"Unexpected {self._label} response: not an object")
         return body
 
     def close(self) -> None:
         self._client.close()
+
+    def _status_error(self, response: httpx.Response) -> ProviderUnavailable | ProviderRejected:
+        message = f"{self._label} returned {response.status_code}: {_error_message(response)}"
+        if response.status_code == TOO_MANY_REQUESTS or response.is_server_error:
+            return ProviderUnavailable(message, retry_after=_retry_after(response))
+        return ProviderRejected(message)
+
+
+def _retry_after(response: httpx.Response) -> float | None:
+    try:
+        return float(response.headers["Retry-After"])
+    except (KeyError, ValueError):
+        return None
 
 
 def _error_message(response: httpx.Response) -> str:

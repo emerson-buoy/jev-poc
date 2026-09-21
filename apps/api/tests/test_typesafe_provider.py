@@ -2,7 +2,7 @@ import httpx
 import pytest
 import respx
 
-from app.triage.port import TicketContent, TriageError
+from app.triage.port import MalformedResponse, TicketContent, TriageError
 from app.triage.typesafe import TypeSafeTriageProvider
 
 BASE_URL = "https://api.typesafe.ai/v1"
@@ -80,3 +80,10 @@ def test_network_error_becomes_triage_error():
 
 def test_provider_name():
     assert provider.name == "typesafe"
+
+
+@respx.mock
+def test_missing_answers_is_malformed():
+    respx.post(URL).mock(return_value=httpx.Response(200, json={"model": "x"}))
+    with pytest.raises(MalformedResponse):
+        provider.evaluate(content)

@@ -1,6 +1,11 @@
 import pytest
 
-from app.triage.port import TicketContent, TriageError
+from app.triage.port import (
+    MalformedResponse,
+    ProviderRejected,
+    ProviderUnavailable,
+    TicketContent,
+)
 
 
 def test_meta_reports_mock_provider(client):
@@ -105,17 +110,60 @@ def test_move_rejects_unknown_status(client):
 class FailingProvider:
     name = "mock"
 
+    def __init__(self, error: Exception) -> None:
+        self.error = error
+
     def evaluate(self, content: TicketContent):
-        raise TriageError("gateway exploded")
+        raise self.error
+
+    def close(self) -> None:
+        return None
 
 
-@pytest.mark.parametrize("provider", [FailingProvider()])
-def test_triage_failure_rejects_move(client):
+def move_to_triaged(client):
     created = client.post("/tickets", json={"title": "A", "description": "b"}).json()
     res = client.post(f"/tickets/{created['id']}/move", json={"status": "triaged"})
-    assert res.status_code == 502
-    assert "gateway exploded" in res.json()["detail"]
     assert client.get(f"/tickets/{created['id']}").json()["status"] == "new"
+    return res
+
+
+@pytest.mark.parametrize("provider", [FailingProvider(ProviderRejected("401: key sk-secret"))])
+def test_rejected_triage_is_502_without_upstream_text(client):
+    res = move_to_triaged(client)
+    assert res.status_code == 502
+    assert res.json()["detail"] == "Triage provider rejected the request"
+
+
+@pytest.mark.parametrize(
+    "provider", [FailingProvider(ProviderUnavailable("529 overloaded", retry_after=7))]
+)
+def test_unavailable_triage_is_503_with_retry_after(client):
+    res = move_to_triaged(client)
+    assert res.status_code == 503
+    assert res.headers["retry-after"] == "7"
+    assert res.json()["detail"] == "Triage is temporarily unavailable, try again"
+
+
+@pytest.mark.parametrize("provider", [FailingProvider(ProviderUnavailable("timed out"))])
+def test_unavailable_triage_without_retry_after(client):
+    res = move_to_triaged(client)
+    assert res.status_code == 503
+    assert "retry-after" not in res.headers
+
+
+@pytest.mark.parametrize("provider", [FailingProvider(MalformedResponse("KeyError('answers')"))])
+def test_malformed_triage_is_502(client):
+    res = move_to_triaged(client)
+    assert res.status_code == 502
+    assert res.json()["detail"] == "Triage provider returned an unusable response"
+
+
+@pytest.mark.parametrize("provider", [FailingProvider(ProviderUnavailable("timed out"))])
+def test_retriage_failure_uses_the_same_mapping(client):
+    seeded = next(t for t in client.get("/tickets").json() if t["status"] == "triaged")
+    res = client.post(f"/tickets/{seeded['id']}/triage")
+    assert res.status_code == 503
+    assert client.get(f"/tickets/{seeded['id']}").json()["triage"] == seeded["triage"]
 
 
 def test_retriage_replaces_result_and_archives_the_old_one(client):

@@ -3,7 +3,7 @@ import pytest
 import respx
 
 from app.triage.jev import GATEWAY_EVALUATE_URL, JevTriageProvider
-from app.triage.port import TicketContent, TriageError
+from app.triage.port import MalformedResponse, TicketContent, TriageError
 
 GATEWAY_RESPONSE = {
     "model": "typesafe-ai/jev",
@@ -85,3 +85,10 @@ def test_network_error_becomes_triage_error():
 
 def test_provider_name():
     assert provider.name == "jev"
+
+
+@respx.mock
+def test_missing_answers_is_malformed():
+    respx.post(GATEWAY_EVALUATE_URL).mock(return_value=httpx.Response(200, json={"model": "x"}))
+    with pytest.raises(MalformedResponse):
+        provider.evaluate(content)

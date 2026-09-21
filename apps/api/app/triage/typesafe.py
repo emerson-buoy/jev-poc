@@ -4,9 +4,9 @@ from app.triage.http import HttpEvaluator
 from app.triage.port import (
     BooleanAnswer,
     ChoiceAnswer,
+    MalformedResponse,
     ScoreAnswer,
     TicketContent,
-    TriageError,
     TriageEvaluation,
 )
 from app.triage.questions import QUESTIONS
@@ -62,4 +62,4 @@ def _parse(body: dict) -> TriageEvaluation:
             confidence=confidence or None,
         )
     except (KeyError, TypeError, ValueError, AttributeError) as error:
-        raise TriageError(f"Unexpected TypeSafe response: {error!r}") from error
+        raise MalformedResponse(f"Unexpected TypeSafe response: {error!r}") from error

@@ -1,11 +1,23 @@
-"""Provider-neutral triage contract. No HTTP or framework types cross this boundary."""
-
 from dataclasses import dataclass
 from typing import Protocol
 
 
 class TriageError(Exception):
-    """Raised by a provider when an evaluation cannot be produced."""
+    pass
+
+
+class ProviderUnavailable(TriageError):
+    def __init__(self, message: str, retry_after: float | None = None) -> None:
+        super().__init__(message)
+        self.retry_after = retry_after
+
+
+class ProviderRejected(TriageError):
+    pass
+
+
+class MalformedResponse(TriageError):
+    pass
 
 
 @dataclass(frozen=True)
@@ -22,8 +34,6 @@ class ChoiceAnswer:
 
 @dataclass(frozen=True)
 class ScoreAnswer:
-    """score is a fractional 0-based position over the ordered levels."""
-
     score: float
     probabilities: dict[int, float] | None = None
 

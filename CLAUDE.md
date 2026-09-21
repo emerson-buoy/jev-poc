@@ -63,7 +63,9 @@ A Kanban board (`apps/web`, TanStack Start) backed by a FastAPI service
   `REFUND_THRESHOLD` 0.5, provider name, timestamp). `factory.py` picks the
   adapter from settings at startup and stores it on `app.state`.
 - Routers stay thin. Triage side effects live in `run_triage` in
-  `routers/tickets.py`, which converts `TriageError` to HTTP 502.
+  `routers/tickets.py`, which maps `ProviderUnavailable` to HTTP 503 with
+  `Retry-After` and every other `TriageError` to 502. Client-facing details
+  are fixed strings; upstream bodies go to the log only.
 - `operation_id` in `main.py` uses the route name so generated client
   functions read `listTickets`, `moveTicket`. Keep route function names stable.
 - Tests use the mock provider and an in-memory SQLite engine through
