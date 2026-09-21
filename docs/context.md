@@ -148,6 +148,28 @@ timestamp recorded.
   `pnpm generate:client`. Commit both outputs.
 - Score answers are 0-based on the wire and 1-based everywhere the UI shows
   them.
+- Renaming or moving the repo folder breaks `apps/api/.venv`: uv's console
+  scripts keep the old absolute path in their shebang, so `pytest` fails to
+  spawn while `python` still works. `run.sh` detects this and recreates the
+  venv; by hand, `rm -rf apps/api/.venv && uv sync --directory apps/api`.
+
+## Docker
+
+`docker-compose.yml` runs `api` (Dockerfile in `apps/api`, uv image,
+`fastapi run`, healthcheck on `/meta`, SQLite on the `api-data` volume) and
+`web` (Dockerfile in `apps/web` built from the repo root because it needs the
+workspace lockfile and `apps/api/openapi.json`; nitro server output only).
+`web` waits for `api` to be healthy and reaches it at `http://api:8000`.
+Verified 2026-09-21: build, health, SSR of the board, a live TypeSafe triage
+through the containers, data surviving `restart`.
+
+The web build pins pnpm 11.1.0 via `packageManager` and corepack. Newer pnpm
+11.x enforces a one-day minimum release age on lockfile entries, and a
+same-day TanStack Query release made the build fail before the pin.
+
+HTTP auth in the Python adapters is set once on the `httpx.Client`
+(`headers=` and `base_url=`), the Python counterpart of a request
+interceptor. Do not pass `headers=` per call.
 
 ## Open items
 

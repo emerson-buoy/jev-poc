@@ -28,23 +28,20 @@ class TypeSafeTriageProvider:
     name = "typesafe"
 
     def __init__(
-        self,
-        api_key: str,
-        model_id: str = DEFAULT_MODEL_ID,
-        base_url: str = DEFAULT_BASE_URL,
-        client: httpx.Client | None = None,
+        self, api_key: str, model_id: str = DEFAULT_MODEL_ID, base_url: str = DEFAULT_BASE_URL
     ) -> None:
-        self._api_key = api_key
         self._model_id = model_id
-        self._url = f"{base_url.rstrip('/')}/systemone"
-        self._client = client or httpx.Client(timeout=REQUEST_TIMEOUT_SECONDS)
+        # Auth and base URL are set once on the client, so every call inherits them.
+        self._client = httpx.Client(
+            base_url=base_url.rstrip("/"),
+            headers={"Authorization": f"Bearer {api_key}"},
+            timeout=REQUEST_TIMEOUT_SECONDS,
+        )
 
     def evaluate(self, content: TicketContent) -> TriageEvaluation:
         payload = {"model": self._model_id, "state": asdict(content), "questions": _WIRE_QUESTIONS}
         try:
-            response = self._client.post(
-                self._url, json=payload, headers={"Authorization": f"Bearer {self._api_key}"}
-            )
+            response = self._client.post("/systemone", json=payload)
         except httpx.HTTPError as error:
             raise TriageError(f"Could not reach TypeSafe: {error}") from error
         if response.is_error:

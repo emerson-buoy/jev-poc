@@ -22,25 +22,19 @@ class JevTriageProvider:
     name = "jev"
 
     def __init__(
-        self,
-        api_key: str,
-        model_id: str,
-        evaluate_url: str = GATEWAY_EVALUATE_URL,
-        client: httpx.Client | None = None,
+        self, api_key: str, model_id: str, evaluate_url: str = GATEWAY_EVALUATE_URL
     ) -> None:
-        self._api_key = api_key
         self._model_id = model_id
         self._url = evaluate_url
-        self._client = client or httpx.Client(timeout=REQUEST_TIMEOUT_SECONDS)
+        # Auth is set once on the client, so every call inherits it.
+        self._client = httpx.Client(
+            headers={"Authorization": f"Bearer {api_key}"}, timeout=REQUEST_TIMEOUT_SECONDS
+        )
 
     def evaluate(self, content: TicketContent) -> TriageEvaluation:
         payload = {"model": self._model_id, "state": asdict(content), "questions": QUESTIONS}
         try:
-            response = self._client.post(
-                self._url,
-                json=payload,
-                headers={"Authorization": f"Bearer {self._api_key}"},
-            )
+            response = self._client.post(self._url, json=payload)
         except httpx.HTTPError as error:
             raise TriageError(f"Could not reach the AI Gateway: {error}") from error
         if response.is_error:

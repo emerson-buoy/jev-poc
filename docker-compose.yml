@@ -1,0 +1,30 @@
+services:
+  api:
+    build:
+      context: apps/api
+    image: jev-ticket-classifier-api
+    env_file:
+      - path: apps/api/.env
+        required: false
+    environment:
+      DATABASE_URL: sqlite:////data/jev.db
+    volumes:
+      - api-data:/data
+    ports:
+      - "8000:8000"
+
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+    image: jev-ticket-classifier-web
+    environment:
+      API_URL: http://api:8000
+    ports:
+      - "3000:3000"
+    depends_on:
+      api:
+        condition: service_healthy
+
+volumes:
+  api-data:

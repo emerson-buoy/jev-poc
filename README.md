@@ -25,8 +25,11 @@ so in a banner.
 ./run.sh
 ```
 
-It installs whatever is missing and starts both apps. `./run.sh --check` runs
-the tests, linters, typecheck and build instead. By hand, the same is:
+It installs or updates everything (pnpm through corepack and uv, with your
+permission, if they are missing; JavaScript and Python dependencies; the
+generated API client) and starts both apps. `./run.sh --check` runs the
+tests, linters, typecheck and build instead, and `./run.sh --setup` only
+installs. By hand, the same is:
 
 ```bash
 pnpm install
@@ -42,6 +45,21 @@ either `TYPESAFE_API_KEY` (a TypeSafe AI account, calls Jev directly) or
 `AI_GATEWAY_API_KEY` (Vercel AI Gateway). The provider switches automatically,
 preferring TypeSafe when both are set. See `apps/api/README.md` for every
 variable.
+
+## Docker
+
+```bash
+docker compose up --build
+```
+
+Builds both images and starts the API on :8000 and the board on :3000. The
+API reads `apps/api/.env` if present, so a `TYPESAFE_API_KEY` there switches
+it to live Jev; without one it runs the mock. SQLite lives in the `api-data`
+volume and survives restarts. `docker compose down -v` removes it.
+
+Images: the API is Python 3.13 with uv, dependencies from `uv.lock`, no dev
+tools. The web image builds the Start app with pnpm 11.1.0 pinned through
+corepack and ships only the nitro server output on `node:22-alpine`.
 
 ## How it works
 
@@ -95,6 +113,7 @@ apps/
     src/lib/           Queries, board helpers, generated client
     src/components/    Board, column, card, detail panel, dialogs
     src/routes/        File-based routes
+docker-compose.yml     Both services, API volume, healthcheck ordering
 CLAUDE.md              Rules and conventions for this repo
 docs/context.md        Full project context: history, decisions, wire formats, gotchas
 docs/original-spec.md  The spec the first version was built from

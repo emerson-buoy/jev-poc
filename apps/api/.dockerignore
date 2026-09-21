@@ -1,0 +1,10 @@
+.venv
+.env
+*.db
+*.db-journal
+__pycache__
+.pytest_cache
+.ruff_cache
+tests
+scripts
+README.md
