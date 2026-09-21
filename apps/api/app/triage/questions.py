@@ -2,12 +2,17 @@
 
 DEPARTMENTS: tuple[str, ...] = ("billing", "technical", "general")
 
+# Urgency weighs time pressure and harm together. Harm means money, data or trust:
+# a wrong charge blocks nothing but still deserves a fast response.
 URGENCY_LEVELS: tuple[str, ...] = (
-    "No time pressure. Informational or cosmetic.",
-    "Minor inconvenience with an easy workaround.",
-    "Affecting some of the customer's work; workaround exists.",
-    "Blocking part of the customer's work; no good workaround.",
-    "Active outage or blocking issue affecting the customer right now.",
+    "No time pressure and no harm. Informational, cosmetic, or a question.",
+    "Minor inconvenience with an easy workaround. No money or data at stake.",
+    "Affecting some of the customer's work, or a small billing error or wrong charge. "
+    "A workaround exists.",
+    "Blocking part of the customer's work with no good workaround, or the customer is losing "
+    "money, was charged for something they do not owe, or lost data.",
+    "Active outage, the customer is blocked right now, or significant financial or data harm "
+    "is ongoing.",
 )
 
 QUESTIONS: dict[str, dict] = {
@@ -23,8 +28,9 @@ QUESTIONS: dict[str, dict] = {
     "urgency": {
         "type": "score",
         "instructions": (
-            "Rate how urgent this ticket is. Level 1 means no time pressure, level 5 means "
-            "an active outage or blocking issue affecting the customer right now."
+            "Rate how urgent this ticket is, weighing time pressure and harm to the customer "
+            "together. Level 1 means no time pressure and no harm. Level 5 means an active "
+            "outage, a customer blocked right now, or significant ongoing financial or data harm."
         ),
         "criteria": list(URGENCY_LEVELS),
     },

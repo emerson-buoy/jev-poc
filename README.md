@@ -17,7 +17,7 @@ functions, which call a client generated from the API's OpenAPI document.
 
 ## Quick start
 
-Requirements: Node 20+, pnpm, [uv](https://docs.astral.sh/uv/). No AI key
+Requirement: Docker. Nothing else is installed on your machine. No AI key
 needed: without one the API runs a deterministic mock triage and the board says
 so in a banner.
 
@@ -25,20 +25,10 @@ so in a banner.
 ./run.sh
 ```
 
-It installs or updates everything (pnpm through corepack and uv, with your
-permission, if they are missing; JavaScript and Python dependencies; the
-generated API client) and starts both apps. `./run.sh --check` runs the
-tests, linters, typecheck and build instead, and `./run.sh --setup` only
-installs. By hand, the same is:
-
-```bash
-pnpm install
-uv sync --directory apps/api
-pnpm dev
-```
-
-Open http://localhost:3000. The API seeds ten sample tickets across all four
-columns on first start.
+It builds both images and starts the API on :8000 and the board on :3000,
+the same as `docker compose up --build`. Ctrl-C stops them. Open
+http://localhost:3000. The API seeds ten sample tickets across all four
+columns on first start, stored in the `api-data` volume.
 
 To use the real model, copy `apps/api/.env.example` to `apps/api/.env` and set
 either `TYPESAFE_API_KEY` (a TypeSafe AI account, calls Jev directly) or
@@ -48,14 +38,10 @@ variable.
 
 ## Docker
 
-```bash
-docker compose up --build
-```
-
-Builds both images and starts the API on :8000 and the board on :3000. The
-API reads `apps/api/.env` if present, so a `TYPESAFE_API_KEY` there switches
-it to live Jev; without one it runs the mock. SQLite lives in the `api-data`
-volume and survives restarts. `docker compose down -v` removes it.
+`run.sh` is `docker compose up --build` with a few checks. The API reads
+`apps/api/.env` if present, so a `TYPESAFE_API_KEY` there switches it to live
+Jev; without one it runs the mock. SQLite lives in the `api-data` volume and
+survives restarts. `docker compose down -v` removes it.
 
 Images: the API is Python 3.13 with uv, dependencies from `uv.lock`, no dev
 tools. The web image builds the Start app with pnpm 11.1.0 pinned through
@@ -85,12 +71,14 @@ corepack and ships only the nitro server output on `node:22-alpine`.
   synthesized probabilities so the board behaves the same without a key. Every
   result records which provider answered.
 
-## Commands
+## Developing
 
-Root scripts run both apps.
+Running is Docker only. Working on the code uses the toolchains directly:
+Node 20+ with pnpm 11.1.0 (corepack) and [uv](https://docs.astral.sh/uv/).
 
 ```bash
-pnpm dev             # both dev servers
+pnpm install && uv sync --directory apps/api
+pnpm dev             # both dev servers with hot reload, outside Docker
 pnpm test            # pytest then vitest
 pnpm lint            # ruff then eslint
 pnpm export:openapi  # apps/api/openapi.json from the FastAPI app

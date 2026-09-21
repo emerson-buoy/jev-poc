@@ -110,7 +110,10 @@ A Kanban board (`apps/web`, TanStack Start) backed by a FastAPI service
 
 - Tests first for both apps. Before calling work done, at the root:
   `pnpm test`, `pnpm lint`, and in `apps/web` `pnpm typecheck` and
-  `pnpm build`.
+  `pnpm build`, then `docker compose build` to prove the images still build.
+- `run.sh` is Docker only, by Emerson's decision: it must never install or
+  start anything on the host. Local dev servers are `pnpm dev` for people
+  working on the code, not a supported way to run the app.
 - The user commits manually. Do not commit unless told to.
 - The `typesafe` provider was verified live on 2026-09-21 (three tickets,
   sub-second responses). The `jev` gateway provider is covered by recorded

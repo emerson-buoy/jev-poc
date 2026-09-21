@@ -56,6 +56,7 @@ you want to change one, it is a product decision, not a refactor.
 | Env layout | Each app owns its `.env` and `.env.example`; API also reads a repo-root `.env` | Emerson: "each app has its own" |
 | Tests | pytest with the mock adapter; Vitest plus Testing Library with server functions mocked; no Playwright | Nothing hits the network |
 | Realtime | Deferred to `TODO.md`; Query refetches on focus and after mutations | Emerson: "hmmm add to TODO" |
+| Urgency rubric | Time pressure and harm weighed together; wrong charges and data loss reach level 4 | A "$500 wrongly debited" ticket scored 2/5 under the original time-pressure-only rubric; Emerson chose to fold harm in rather than add a fourth question |
 
 Earlier, for the Nest CLI, he chose Nest defaults over bespoke setup and
 said "this is a POC anyway". He prefers framework conventions for POCs.
@@ -97,6 +98,16 @@ picks `typesafe` with `TYPESAFE_API_KEY`, else `jev` with
   refund 0.92 when "refund" appears, 0.25 when negated ("not a refund"),
   0.05 otherwise. Probabilities are synthesized around the chosen answer.
 
+**Urgency rubric** (`questions.py`, changed 2026-09-21 after the live run):
+levels 1 to 5 describe time pressure and harm together. Level 3 includes a
+small billing error, level 4 includes losing money, being charged for
+something not owed, or losing data, level 5 includes significant ongoing
+financial or data harm. Verified live: "500 usd wrongly debited" went from
+2/5 to 4/5 with 87% mass on level 4; outage, low-priority question and
+medium bug tickets kept their levels. The mock mirrors this with a
+`HARM_WORDS` list, and its outage keyword is "500 error", not "500", so
+amounts do not read as HTTP errors.
+
 **Service mapping** (`service.py`): urgency level is the 1-based argmax of
 the distribution (rounded score plus one without one); urgency mean is the
 raw score plus one; refund flag at `REFUND_THRESHOLD` 0.5; provider name and
@@ -124,7 +135,7 @@ timestamp recorded.
 | --- | --- |
 | API pytest | 50 pass, no network |
 | Web vitest | 19 pass, API mocked |
-| Ruff, ESLint, tsc, build | clean, via `./run.sh --check` |
+| Ruff, ESLint, tsc, build | clean, via `pnpm lint`, `pnpm --filter web typecheck`, `pnpm --filter web build` |
 | Browser | board, drag into Triaged, detail panel, override, history verified in Chrome |
 | Live Jev | typesafe provider, three tickets |
 | Gateway provider | recorded responses only |
@@ -150,10 +161,16 @@ timestamp recorded.
   them.
 - Renaming or moving the repo folder breaks `apps/api/.venv`: uv's console
   scripts keep the old absolute path in their shebang, so `pytest` fails to
-  spawn while `python` still works. `run.sh` detects this and recreates the
-  venv; by hand, `rm -rf apps/api/.venv && uv sync --directory apps/api`.
+  spawn while `python` still works. Fix: `rm -rf apps/api/.venv && uv sync
+  --directory apps/api`.
 
 ## Docker
+
+`run.sh` is Docker only. Emerson's words: "default AND ONLY action in run is
+to run this whole thing AND its deps into docker", "no local support". It
+checks Docker is installed and running, warns when no key is configured, and
+execs `docker compose up --build`. It no longer installs pnpm, uv or
+dependencies on the host; those are for people editing the code (`pnpm dev`).
 
 `docker-compose.yml` runs `api` (Dockerfile in `apps/api`, uv image,
 `fastapi run`, healthcheck on `/meta`, SQLite on the `api-data` volume) and

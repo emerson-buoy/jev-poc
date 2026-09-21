@@ -21,6 +21,15 @@ def test_duplicate_charge_is_billing_with_refund():
     assert result.refund.probability >= 0.5
 
 
+def test_financial_harm_raises_urgency_without_time_pressure():
+    result = evaluate(
+        "500 usd wrongly debited from my account",
+        "I see this entry on my bill and I only pay for 20 usd subscription.",
+    )
+    assert result.department.choice == "billing"
+    assert result.urgency.score == 3
+
+
 def test_explicitly_not_a_refund_stays_below_threshold():
     result = evaluate("Pricing", "Why did my plan renew higher? I want clarity, not a refund.")
     assert result.department.choice == "billing"

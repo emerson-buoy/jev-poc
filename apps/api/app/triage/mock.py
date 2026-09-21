@@ -45,9 +45,21 @@ TECHNICAL_WORDS = (
 )
 GENERAL_WORDS = ("account", "name", "feedback", "question", "wondering", "how do", "feature")
 
-CRITICAL_WORDS = ("outage", "down", "500", "crash", "losing")
+CRITICAL_WORDS = ("outage", "down", "500 error", "crash", "losing sales")
 PRESSING_WORDS = ("immediately", "urgent", "asap", "today", "blocking", "escalate")
 MODERATE_WORDS = ("affecting", "customers", "since", "every time", "third time")
+HARM_WORDS = (
+    "wrongly",
+    "debited",
+    "charged twice",
+    "double charge",
+    "unauthorized",
+    "still billed",
+    "lost my work",
+    "lost data",
+    "data loss",
+    "losing money",
+)
 RELAXED_WORDS = ("no rush", "whenever", "just wondering", "not blocking", "no hurry")
 
 NOT_REFUND = re.compile(r"\b(not|no)( necessarily)? (a |the )?refund", re.IGNORECASE)
@@ -85,7 +97,7 @@ class MockTriageProvider:
         level = 1
         if _count(text, MODERATE_WORDS):
             level = 3
-        if _count(text, PRESSING_WORDS):
+        if _count(text, PRESSING_WORDS) or _count(text, HARM_WORDS):
             level = 4
         if _count(text, CRITICAL_WORDS):
             level = 5
