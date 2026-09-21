@@ -204,9 +204,16 @@ broadcaster with Redis pub/sub or Postgres LISTEN before scaling out.
 
 ## Open items
 
-See `TODO.md`: auto-triage on create, realtime updates, gateway provider live
-check. Package names (`jev-triage-board`, `jev-triage-api`) and the UI title
-"Jev Triage Board" predate the repo name and were left as is.
+`TODO.md` is the list: what has shipped (PRs 1 to 7, checked), the open
+engineering items in suggested order (ticket service extraction, EventSource
+reconnect, circuit state over the stream, idempotency keys, optimistic
+locking, persistence hygiene, health endpoint, validated settings,
+observability, spend budget, comment strip, hook tests, coverage), and the
+product decisions that need a yes before anyone builds them: auto-triage on
+create, a fallback provider chain, and a live check of the gateway provider
+once a Vercel key exists. Package names (`jev-triage-board`,
+`jev-triage-api`) and the UI title "Jev Triage Board" predate the repo name
+and were left as is.
 
 ## Working with Emerson
 
