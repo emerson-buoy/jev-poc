@@ -1,3 +1,5 @@
+import logging
+from math import ceil
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -6,9 +8,10 @@ from sqlmodel import Session, col, select
 from app.db import get_session
 from app.models import DiscardReason, Ticket, TicketStatus, TriageRecord, utcnow
 from app.schemas import MoveRequest, TicketCreate, TicketRead, TicketUpdate, TriageRecordRead
-from app.triage.port import TicketContent, TriageError
+from app.triage.port import ProviderRejected, ProviderUnavailable, TicketContent, TriageError
 from app.triage.service import TriageService, TriageServiceDep
 
+log = logging.getLogger(__name__)
 router = APIRouter(prefix="/tickets", tags=["tickets"])
 
 SessionDep = Annotated[Session, Depends(get_session)]
@@ -74,7 +77,23 @@ def run_triage(ticket: Ticket, triage: TriageService) -> None:
     try:
         ticket.triage = triage.triage(content).model_dump(mode="json")
     except TriageError as error:
-        raise HTTPException(status.HTTP_502_BAD_GATEWAY, f"Triage failed: {error}") from error
+        log.warning("Triage of ticket %s failed: %s", ticket.id, error)
+        raise _http_error(error) from error
+
+
+def _http_error(error: TriageError) -> HTTPException:
+    if isinstance(error, ProviderUnavailable):
+        headers = {"Retry-After": str(ceil(error.retry_after))} if error.retry_after else None
+        return HTTPException(
+            status.HTTP_503_SERVICE_UNAVAILABLE,
+            "Triage is temporarily unavailable, try again",
+            headers=headers,
+        )
+    if isinstance(error, ProviderRejected):
+        return HTTPException(status.HTTP_502_BAD_GATEWAY, "Triage provider rejected the request")
+    return HTTPException(
+        status.HTTP_502_BAD_GATEWAY, "Triage provider returned an unusable response"
+    )
 
 
 def save(session: Session, ticket: Ticket) -> TicketRead:
