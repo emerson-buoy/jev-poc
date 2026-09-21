@@ -1,38 +1,25 @@
 {
-  "name": "jev-triage-app",
+  "name": "jev-triage-board",
   "version": "0.1.0",
-  "description": "CLI that triages support tickets with TypeSafe AI's Jev via the AI SDK experimental_evaluate API",
   "private": true,
-  "license": "UNLICENSED",
-  "type": "module",
+  "description": "Kanban board that triages support tickets with TypeSafe AI's Jev. TanStack Start UI, FastAPI backend.",
   "engines": {
     "node": ">=20"
   },
   "scripts": {
-    "build": "nest build",
-    "start": "nest start",
-    "triage": "node dist/main.js",
-    "test": "vitest run",
-    "test:watch": "vitest",
-    "lint": "oxlint src/",
-    "format": "prettier --write \"src/**/*.ts\"",
-    "typecheck": "tsc -p tsconfig.build.json --noEmit"
-  },
-  "dependencies": {
-    "@nestjs/common": "^12.0.4",
-    "@nestjs/config": "^12.0.0",
-    "@nestjs/core": "^12.0.4",
-    "ai": "^7.0.107",
-    "reflect-metadata": "^0.2.2",
-    "rxjs": "^7.8.1"
+    "dev": "concurrently -n api,web -c blue,magenta \"pnpm dev:api\" \"pnpm dev:web\"",
+    "dev:api": "uv run --directory apps/api fastapi dev app/main.py --port 8000",
+    "dev:web": "pnpm --filter web dev",
+    "test": "pnpm test:api && pnpm test:web",
+    "test:api": "uv run --directory apps/api pytest -q",
+    "test:web": "pnpm --filter web test",
+    "lint": "pnpm lint:api && pnpm lint:web",
+    "lint:api": "uv run --directory apps/api ruff check . && uv run --directory apps/api ruff format --check .",
+    "lint:web": "pnpm --filter web lint",
+    "generate:client": "pnpm --filter web generate:client",
+    "export:openapi": "uv run --directory apps/api python -m scripts.export_openapi"
   },
   "devDependencies": {
-    "@nestjs/cli": "^12.0.3",
-    "@nestjs/testing": "^12.0.4",
-    "@types/node": "^24.0.0",
-    "oxlint": "^1.58.0",
-    "prettier": "^3.4.2",
-    "typescript": "^6.0.2",
-    "vitest": "^4.1.2"
+    "concurrently": "^10.0.5"
   }
 }

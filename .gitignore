@@ -141,3 +141,19 @@ dist
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
 .vite/
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+.ruff_cache/
+*.egg-info/
+apps/api/*.db
+apps/api/*.db-journal
+
+# TanStack Start / Vite
+apps/web/.output/
+apps/web/.nitro/
+apps/web/.tanstack/
+apps/web/src/routeTree.gen.ts
