@@ -30,3 +30,19 @@ def test_defaults():
     assert s.jev_model_id == "typesafe-ai/jev"
     assert s.triage_provider == "auto"
     assert s.database_url.startswith("sqlite:///")
+
+
+def test_auto_prefers_typesafe_key_over_gateway_key():
+    both = settings(typesafe_api_key="t", ai_gateway_api_key="g")
+    assert build_provider(both).name == "typesafe"
+    assert build_provider(settings(typesafe_api_key="t")).name == "typesafe"
+
+
+def test_forced_typesafe_without_key_fails():
+    with pytest.raises(ValueError, match="TYPESAFE_API_KEY"):
+        build_provider(settings(triage_provider="typesafe"))
+
+
+def test_forced_jev_ignores_typesafe_key():
+    forced = settings(typesafe_api_key="t", ai_gateway_api_key="g", triage_provider="jev")
+    assert build_provider(forced).name == "jev"

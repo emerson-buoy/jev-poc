@@ -2,7 +2,7 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import type { ReactNode } from 'react'
 import { TicketDetail } from '@/components/ticket-detail'
-import { ticket, triaged } from '@/lib/fixtures'
+import { discardedRecord, ticket, triaged } from '@/lib/fixtures'
 
 vi.mock('@/server/tickets', () => ({
   fetchTickets: vi.fn(),
@@ -62,6 +62,23 @@ describe('TicketDetail', () => {
         data: { id: 3, department_override: 'billing' },
       }),
     )
+  })
+
+  it('lists discarded triages collapsed under a summary', () => {
+    const withHistory = ticket({ history: [discardedRecord] })
+    render(<TicketDetail ticket={withHistory} onClose={() => {}} />, { wrapper })
+    const details = screen.getByText('Previous triages (1)').closest('details')!
+    expect(details).not.toHaveAttribute('open')
+    expect(details).toHaveTextContent(/Billing/)
+    expect(details).toHaveTextContent(/overridden to General/i)
+    expect(details).toHaveTextContent(/moved back to New/i)
+    expect(details).toHaveTextContent(/urgency 2\/5/i)
+    expect(details).toHaveTextContent(/mock/)
+  })
+
+  it('shows no history section when there is none', () => {
+    render(<TicketDetail ticket={ticket()} onClose={() => {}} />, { wrapper })
+    expect(screen.queryByText(/previous triages/i)).not.toBeInTheDocument()
   })
 
   it('re-triages on demand', async () => {

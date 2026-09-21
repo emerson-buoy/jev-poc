@@ -10,6 +10,7 @@ import {
   SheetTitle,
 } from '@/components/ui/sheet'
 import { ProbabilityBars } from '@/components/probability-bars'
+import { TriageHistory } from '@/components/triage-history'
 import type { TicketRead } from '@/lib/api/generated'
 import {
   DEPARTMENTS,
@@ -136,6 +137,8 @@ export function TicketDetail({ ticket, onClose }: TicketDetailProps) {
               Not triaged yet. Move this card to Triaged to run Jev, or triage it now.
             </p>
           )}
+
+          <TriageHistory records={ticket.history} />
         </div>
 
         <SheetFooter className="flex-row justify-between">

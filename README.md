@@ -38,25 +38,34 @@ Open http://localhost:3000. The API seeds ten sample tickets across all four
 columns on first start.
 
 To use the real model, copy `apps/api/.env.example` to `apps/api/.env` and set
-`AI_GATEWAY_API_KEY` (a Vercel AI Gateway key). The provider switches to Jev
-automatically. See `apps/api/README.md` for every variable.
+either `TYPESAFE_API_KEY` (a TypeSafe AI account, calls Jev directly) or
+`AI_GATEWAY_API_KEY` (Vercel AI Gateway). The provider switches automatically,
+preferring TypeSafe when both are set. See `apps/api/README.md` for every
+variable.
 
 ## How it works
 
 - **Columns** are workflow status: New, Triaged, In progress, Done. Cards move
   freely between them by drag and drop.
-- **Triage runs** when a card enters Triaged for the first time. The API asks
-  three typed questions about the ticket: a department choice, a five-level
-  urgency score and a refund boolean. If the provider fails, the move is
-  rejected and the card snaps back with a toast.
+- **Triage runs** when a card enters Triaged without an active result. The API
+  asks three typed questions about the ticket: a department choice, a
+  five-level urgency score and a refund boolean. If the provider fails, the
+  move is rejected and the card snaps back with a toast.
+- **Moving a card back to New discards its triage.** The result and any human
+  override go to a history table and the card reads "Not triaged, 1 discarded".
+  Re-triage archives the result it replaces the same way. Discarded results
+  are never consulted again; the detail panel lists them collapsed under
+  "Previous triages".
 - **Card badges** show the effective department, urgency level out of five and
   a Refund tag. A `*` marks a department overridden by a person.
 - **Detail panel** (click a card) shows the description, the probability
   distribution for every question, the provider's confidence, which provider
   answered, a department select that stores a human override next to Jev's
   suggestion, and Re-triage and Delete buttons.
-- **Mock mode** uses keyword heuristics with synthesized probabilities so the
-  board behaves the same without a key. Every result records its provider.
+- **Providers.** `typesafe` calls Jev at TypeSafe's own endpoint, `jev` calls
+  it through Vercel AI Gateway, and `mock` uses keyword heuristics with
+  synthesized probabilities so the board behaves the same without a key. Every
+  result records which provider answered.
 
 ## Commands
 

@@ -222,7 +222,7 @@
           "tickets"
         ],
         "summary": "Move Ticket",
-        "description": "Moving into Triaged runs triage once. Any other move is free. Failure leaves the ticket.",
+        "description": "Into Triaged runs triage once. Into New discards the result to history. Else free.",
         "operationId": "move_ticket",
         "parameters": [
           {
@@ -275,7 +275,7 @@
           "tickets"
         ],
         "summary": "Retriage Ticket",
-        "description": "Always asks the provider again and replaces the stored result.",
+        "description": "Asks the provider again. The previous result, if any, goes to history.",
         "operationId": "retriage_ticket",
         "parameters": [
           {
@@ -315,6 +315,14 @@
   },
   "components": {
     "schemas": {
+      "DiscardReason": {
+        "type": "string",
+        "enum": [
+          "moved_to_new",
+          "retriaged"
+        ],
+        "title": "DiscardReason"
+      },
       "HTTPValidationError": {
         "properties": {
           "detail": {
@@ -439,6 +447,13 @@
             ],
             "title": "Effective Department"
           },
+          "history": {
+            "items": {
+              "$ref": "#/components/schemas/TriageRecordRead"
+            },
+            "type": "array",
+            "title": "History"
+          },
           "created_at": {
             "type": "string",
             "format": "date-time",
@@ -459,6 +474,7 @@
           "department_override",
           "triage",
           "effective_department",
+          "history",
           "created_at",
           "updated_at"
         ],
@@ -523,6 +539,50 @@
         "type": "object",
         "title": "TicketUpdate",
         "description": "PATCH body. Fields left out are untouched; department_override may be set to null."
+      },
+      "TriageRecordRead": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "result": {
+            "$ref": "#/components/schemas/TriageResult"
+          },
+          "department_override": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "billing",
+                  "technical",
+                  "general"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Department Override"
+          },
+          "reason": {
+            "$ref": "#/components/schemas/DiscardReason"
+          },
+          "discarded_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Discarded At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "result",
+          "department_override",
+          "reason",
+          "discarded_at"
+        ],
+        "title": "TriageRecordRead"
       },
       "TriageResult": {
         "properties": {

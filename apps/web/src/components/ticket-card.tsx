@@ -57,7 +57,9 @@ export function TicketCard({ ticket, onOpen }: TicketCardProps) {
           </>
         ) : (
           <Badge variant="outline" className="text-muted-foreground">
-            Not triaged
+            {ticket.history.length > 0
+              ? `Not triaged, ${ticket.history.length} discarded`
+              : 'Not triaged'}
           </Badge>
         )}
       </div>

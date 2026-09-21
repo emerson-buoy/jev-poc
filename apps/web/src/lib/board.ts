@@ -1,4 +1,4 @@
-import type { TicketRead, TicketStatus } from '@/lib/api/generated'
+import type { DiscardReason, TicketRead, TicketStatus } from '@/lib/api/generated'
 
 export type Department = NonNullable<TicketRead['effective_department']>
 
@@ -50,4 +50,13 @@ export function urgencyClasses(level: number): string {
   if (level >= 4) return 'bg-red-100 text-red-900 dark:bg-red-900/40 dark:text-red-100'
   if (level === 3) return 'bg-orange-100 text-orange-900 dark:bg-orange-900/40 dark:text-orange-100'
   return 'bg-emerald-100 text-emerald-900 dark:bg-emerald-900/40 dark:text-emerald-100'
+}
+
+const DISCARD_REASONS: Record<DiscardReason, string> = {
+  moved_to_new: 'moved back to New',
+  retriaged: 'replaced by a re-triage',
+}
+
+export function discardReasonLabel(reason: DiscardReason): string {
+  return DISCARD_REASONS[reason] ?? reason
 }

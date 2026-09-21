@@ -65,7 +65,7 @@ export const updateTicket = <ThrowOnError extends boolean = false>(options: Opti
 /**
  * Move Ticket
  *
- * Moving into Triaged runs triage once. Any other move is free. Failure leaves the ticket.
+ * Into Triaged runs triage once. Into New discards the result to history. Else free.
  */
 export const moveTicket = <ThrowOnError extends boolean = false>(options: Options<MoveTicketData, ThrowOnError>): RequestResult<MoveTicketResponses, MoveTicketErrors, ThrowOnError> => (options.client ?? client).post<MoveTicketResponses, MoveTicketErrors, ThrowOnError>({
     url: '/tickets/{ticket_id}/move',
@@ -79,6 +79,6 @@ export const moveTicket = <ThrowOnError extends boolean = false>(options: Option
 /**
  * Retriage Ticket
  *
- * Always asks the provider again and replaces the stored result.
+ * Asks the provider again. The previous result, if any, goes to history.
  */
 export const retriageTicket = <ThrowOnError extends boolean = false>(options: Options<RetriageTicketData, ThrowOnError>): RequestResult<RetriageTicketResponses, RetriageTicketErrors, ThrowOnError> => (options.client ?? client).post<RetriageTicketResponses, RetriageTicketErrors, ThrowOnError>({ url: '/tickets/{ticket_id}/triage', ...options });

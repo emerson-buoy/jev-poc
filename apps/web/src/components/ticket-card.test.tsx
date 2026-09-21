@@ -1,6 +1,6 @@
 import { render, screen, fireEvent } from '@testing-library/react'
 import { TicketCard } from '@/components/ticket-card'
-import { ticket, triaged } from '@/lib/fixtures'
+import { discardedRecord, ticket, triaged } from '@/lib/fixtures'
 
 describe('TicketCard', () => {
   it('shows title and a truncated description without badges when untriaged', () => {
@@ -33,6 +33,11 @@ describe('TicketCard', () => {
     render(<TicketCard ticket={t} onOpen={() => {}} />)
     expect(screen.getByText('Billing')).toBeInTheDocument()
     expect(screen.getByTitle(/overridden/i)).toBeInTheDocument()
+  })
+
+  it('mentions discarded triages on an untriaged card', () => {
+    render(<TicketCard ticket={ticket({ history: [discardedRecord] })} onOpen={() => {}} />)
+    expect(screen.getByText('Not triaged, 1 discarded')).toBeInTheDocument()
   })
 
   it('opens on click', () => {

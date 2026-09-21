@@ -1,4 +1,4 @@
-import type { MetaRead, TicketRead, TriageResult } from '@/lib/api/generated'
+import type { MetaRead, TicketRead, TriageRecordRead, TriageResult } from '@/lib/api/generated'
 
 export const triaged: TriageResult = {
   department: 'technical',
@@ -14,6 +14,14 @@ export const triaged: TriageResult = {
   triaged_at: '2026-09-21T09:00:00+00:00',
 }
 
+export const discardedRecord: TriageRecordRead = {
+  id: 7,
+  result: { ...triaged, department: 'billing', urgency_level: 2, provider: 'mock' },
+  department_override: 'general',
+  reason: 'moved_to_new',
+  discarded_at: '2026-09-21T10:00:00+00:00',
+}
+
 export function ticket(overrides: Partial<TicketRead> = {}): TicketRead {
   return {
     id: 1,
@@ -23,6 +31,7 @@ export function ticket(overrides: Partial<TicketRead> = {}): TicketRead {
     department_override: null,
     triage: null,
     effective_department: null,
+    history: [],
     created_at: '2026-09-21T08:00:00+00:00',
     updated_at: '2026-09-21T08:00:00+00:00',
     ...overrides,

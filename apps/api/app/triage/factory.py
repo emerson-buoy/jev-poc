@@ -4,19 +4,35 @@ from app.config import Settings
 from app.triage.jev import JevTriageProvider
 from app.triage.mock import MockTriageProvider
 from app.triage.port import TriageProvider
+from app.triage.typesafe import TypeSafeTriageProvider
 
 log = logging.getLogger(__name__)
 
 
 def build_provider(settings: Settings) -> TriageProvider:
-    """auto: jev when a key is present, mock otherwise. jev/mock force the choice."""
-    wants_jev = settings.triage_provider == "jev" or (
-        settings.triage_provider == "auto" and bool(settings.ai_gateway_api_key)
-    )
-    if not wants_jev:
-        if settings.triage_provider == "auto":
-            log.warning("AI_GATEWAY_API_KEY not set: running in mock triage mode")
+    """auto: typesafe with a TypeSafe key, else jev with a gateway key, else mock.
+
+    typesafe / jev / mock force the choice; a forced provider without its key fails at boot.
+    """
+    choice = settings.triage_provider
+    if choice == "auto":
+        if settings.typesafe_api_key:
+            choice = "typesafe"
+        elif settings.ai_gateway_api_key:
+            choice = "jev"
+        else:
+            log.warning("No TYPESAFE_API_KEY or AI_GATEWAY_API_KEY: running in mock triage mode")
+            choice = "mock"
+    if choice == "mock":
         return MockTriageProvider()
+    if choice == "typesafe":
+        if not settings.typesafe_api_key:
+            raise ValueError("TRIAGE_PROVIDER=typesafe requires TYPESAFE_API_KEY")
+        return TypeSafeTriageProvider(
+            api_key=settings.typesafe_api_key,
+            model_id=settings.typesafe_model_id,
+            base_url=settings.typesafe_base_url,
+        )
     if not settings.ai_gateway_api_key:
         raise ValueError("TRIAGE_PROVIDER=jev requires AI_GATEWAY_API_KEY")
     return JevTriageProvider(

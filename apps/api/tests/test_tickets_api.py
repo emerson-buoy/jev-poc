@@ -28,6 +28,7 @@ def test_create_ticket_lands_in_new(client):
     assert body["status"] == "new"
     assert body["triage"] is None
     assert body["effective_department"] is None
+    assert body["history"] == []
     assert client.get(f"/tickets/{body['id']}").json() == body
 
 
@@ -51,14 +52,42 @@ def test_move_to_triaged_runs_triage(client):
     assert body["effective_department"] == "billing"
 
 
-def test_move_to_triaged_keeps_existing_result(client, provider):
+def test_move_back_to_new_discards_triage_into_history(client):
     created = client.post("/tickets", json={"title": "A", "description": "outage"}).json()
     first = client.post(f"/tickets/{created['id']}/move", json={"status": "triaged"}).json()
+    client.patch(f"/tickets/{created['id']}", json={"department_override": "general"})
     back = client.post(f"/tickets/{created['id']}/move", json={"status": "new"}).json()
     assert back["status"] == "new"
-    assert back["triage"] == first["triage"]
+    assert back["triage"] is None
+    assert back["department_override"] is None
+    assert back["effective_department"] is None
+    assert len(back["history"]) == 1
+    record = back["history"][0]
+    assert record["result"] == first["triage"]
+    assert record["department_override"] == "general"
+    assert record["reason"] == "moved_to_new"
+    assert record["discarded_at"]
+
+
+def test_re_entering_triaged_after_discard_triages_again(client):
+    created = client.post("/tickets", json={"title": "A", "description": "outage"}).json()
+    client.post(f"/tickets/{created['id']}/move", json={"status": "triaged"})
+    client.post(f"/tickets/{created['id']}/move", json={"status": "new"})
     again = client.post(f"/tickets/{created['id']}/move", json={"status": "triaged"}).json()
-    assert again["triage"] == first["triage"]
+    assert again["triage"] is not None
+    assert len(again["history"]) == 1
+
+
+def test_moving_forward_keeps_triage_and_history(client):
+    created = client.post("/tickets", json={"title": "A", "description": "outage"}).json()
+    triaged = client.post(f"/tickets/{created['id']}/move", json={"status": "triaged"}).json()
+    done = client.post(f"/tickets/{created['id']}/move", json={"status": "done"}).json()
+    assert done["triage"] == triaged["triage"]
+    assert done["history"] == []
+    back_to_triaged = client.post(
+        f"/tickets/{created['id']}/move", json={"status": "triaged"}
+    ).json()
+    assert back_to_triaged["triage"] == triaged["triage"]
 
 
 def test_move_between_other_columns_does_not_triage(client):
@@ -89,12 +118,27 @@ def test_triage_failure_rejects_move(client):
     assert client.get(f"/tickets/{created['id']}").json()["status"] == "new"
 
 
-def test_retriage_replaces_result(client):
+def test_retriage_replaces_result_and_archives_the_old_one(client):
     seeded = next(t for t in client.get("/tickets").json() if t["status"] == "triaged")
     res = client.post(f"/tickets/{seeded['id']}/triage")
     assert res.status_code == 200
-    assert res.json()["triage"]["provider"] == "mock"
-    assert res.json()["status"] == "triaged"
+    body = res.json()
+    assert body["triage"]["provider"] == "mock"
+    assert body["status"] == "triaged"
+    assert len(body["history"]) == 1
+    assert body["history"][0]["result"] == seeded["triage"]
+    assert body["history"][0]["reason"] == "retriaged"
+
+
+def test_history_is_newest_first(client):
+    created = client.post("/tickets", json={"title": "A", "description": "outage"}).json()
+    client.post(f"/tickets/{created['id']}/move", json={"status": "triaged"})
+    client.post(f"/tickets/{created['id']}/move", json={"status": "new"})
+    client.post(f"/tickets/{created['id']}/move", json={"status": "triaged"})
+    client.post(f"/tickets/{created['id']}/triage")
+    history = client.get(f"/tickets/{created['id']}").json()["history"]
+    assert [h["reason"] for h in history] == ["retriaged", "moved_to_new"]
+    assert history[0]["id"] > history[1]["id"]
 
 
 def test_department_override(client):
@@ -122,10 +166,18 @@ def test_update_title_and_description(client):
     assert res.json()["description"] == "c"
 
 
-def test_delete_ticket(client):
+def test_delete_ticket_removes_its_history(client, session):
+    from sqlmodel import select
+
+    from app.models import TriageRecord
+
     created = client.post("/tickets", json={"title": "A", "description": "b"}).json()
+    client.post(f"/tickets/{created['id']}/move", json={"status": "triaged"})
+    client.post(f"/tickets/{created['id']}/move", json={"status": "new"})
     assert client.delete(f"/tickets/{created['id']}").status_code == 204
     assert client.get(f"/tickets/{created['id']}").status_code == 404
+    records = session.exec(select(TriageRecord).where(TriageRecord.ticket_id == created["id"]))
+    assert records.all() == []
 
 
 def test_unknown_ticket_is_404(client):

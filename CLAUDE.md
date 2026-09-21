@@ -19,19 +19,30 @@ A Kanban board (`apps/web`, TanStack Start) backed by a FastAPI service
   realtime updates are deferred in `TODO.md`.
 - A failed triage rejects the move (HTTP 502 from the API, optimistic update
   rolled back in the UI, toast shown). A card in Triaged always has a result.
-- Moving a card back to New keeps its result. Re-entering Triaged does not
-  re-run triage; the Re-triage button does.
+- Moving a card into New discards the active triage: the result and the
+  human override are copied to `TriageRecord` (reason `moved_to_new`) and
+  cleared on the ticket, so re-entering Triaged runs triage again. Re-triage
+  archives the replaced result with reason `retriaged`. History is returned
+  on every ticket as `history`, newest first, and is display-only: nothing
+  reads it for decisions. The detail panel shows it collapsed.
 - Department override is a human decision stored beside Jev's suggestion.
   `effective_department` is override if set, else Jev's choice.
 - Ten seed tickets span all columns. Results outside New are static fixtures
   with `"provider": "seed"`, so the board works without any provider call.
-- Mock mode: `TRIAGE_PROVIDER=auto` picks `jev` when `AI_GATEWAY_API_KEY` is
-  set and `mock` otherwise. `mock` is deterministic keyword heuristics with
-  synthesized probabilities. The board shows a banner whenever `/meta` reports
-  the mock. Every stored result records its provider.
-- Python calls Jev over plain HTTP: `POST https://ai-gateway.vercel.sh/v1/evaluate`
-  with the same `choice`, `score`, `boolean` questions the JS SDK uses. No
-  TypeSafe or Vercel Python SDK.
+- Providers: `TRIAGE_PROVIDER=auto` picks `typesafe` when `TYPESAFE_API_KEY`
+  is set, else `jev` when `AI_GATEWAY_API_KEY` is set, else `mock`. `mock` is
+  deterministic keyword heuristics with synthesized probabilities. The board
+  shows a banner whenever `/meta` reports the mock. Every stored result
+  records its provider.
+- Python calls Jev over plain HTTP, no TypeSafe or Vercel SDK. `typesafe.py`
+  posts to `POST {TYPESAFE_BASE_URL}/systemone` in TypeSafe's wire format
+  (yes/no questions are type `noul`, answers carry `noul` or per-answer
+  `confidence`, score probabilities are keyed by 0-based index strings).
+  `jev.py` posts to the gateway's `/v1/evaluate` with the AI SDK naming
+  (`boolean`, `probability`, confidence under `providerMetadata`). Both map
+  to the same `TriageEvaluation`.
+- Emerson keeps `TYPESAFE_API_KEY` in `apps/api/.env`. Never read or print
+  that file. Verify live behavior through the running API's responses only.
 - The web app never calls FastAPI from the browser. Server functions in
   `apps/web/src/server/tickets.ts` wrap the generated client; TanStack Query
   calls the server functions; route loaders prefetch through the QueryClient.
@@ -82,6 +93,12 @@ A Kanban board (`apps/web`, TanStack Start) backed by a FastAPI service
 - Chrome automation cannot exercise the drag: synthetic mouse events do not
   produce HTML5 drag events. Dispatching `DragEvent`s with a `DataTransfer`
   does work for manual verification.
+- Stopping dev servers: `fastapi dev` runs a reloader whose children have
+  `multiprocessing` command lines, so a `pkill` on the fastapi pattern leaves
+  them bound to 8000. Kill `jev-poc/apps/api/.venv/bin/python` processes too,
+  then confirm both ports bind with a socket test before starting again. A
+  leftover server with its SQLite file deleted answers reads and returns 500
+  on writes, which looks like an application bug.
 
 ## Workflow
 
@@ -89,4 +106,6 @@ A Kanban board (`apps/web`, TanStack Start) backed by a FastAPI service
   `pnpm test`, `pnpm lint`, and in `apps/web` `pnpm typecheck` and
   `pnpm build`.
 - The user commits manually. Do not commit unless told to.
-- Live Jev runs are unverified: no gateway key was available. See `TODO.md`.
+- The `typesafe` provider was verified live on 2026-09-21 (three tickets,
+  sub-second responses). The `jev` gateway provider is covered by recorded
+  responses only.

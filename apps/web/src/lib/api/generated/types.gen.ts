@@ -5,6 +5,11 @@ export type ClientOptions = {
 };
 
 /**
+ * DiscardReason
+ */
+export type DiscardReason = 'moved_to_new' | 'retriaged';
+
+/**
  * HTTPValidationError
  */
 export type HttpValidationError = {
@@ -76,6 +81,10 @@ export type TicketRead = {
      */
     effective_department: 'billing' | 'technical' | 'general' | null;
     /**
+     * History
+     */
+    history: Array<TriageRecordRead>;
+    /**
      * Created At
      */
     created_at: string;
@@ -108,6 +117,26 @@ export type TicketUpdate = {
      * Department Override
      */
     department_override?: 'billing' | 'technical' | 'general' | null;
+};
+
+/**
+ * TriageRecordRead
+ */
+export type TriageRecordRead = {
+    /**
+     * Id
+     */
+    id: number;
+    result: TriageResult;
+    /**
+     * Department Override
+     */
+    department_override: 'billing' | 'technical' | 'general' | null;
+    reason: DiscardReason;
+    /**
+     * Discarded At
+     */
+    discarded_at: string;
 };
 
 /**

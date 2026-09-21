@@ -3,7 +3,7 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from app.models import TicketStatus
+from app.models import DiscardReason, TicketStatus
 from app.triage.questions import DEPARTMENTS
 from app.triage.service import TriageResult
 
@@ -30,6 +30,14 @@ class MoveRequest(BaseModel):
     status: TicketStatus
 
 
+class TriageRecordRead(BaseModel):
+    id: int
+    result: TriageResult
+    department_override: Department | None
+    reason: DiscardReason
+    discarded_at: datetime
+
+
 class TicketRead(BaseModel):
     id: int
     title: str
@@ -38,6 +46,7 @@ class TicketRead(BaseModel):
     department_override: Department | None
     triage: TriageResult | None
     effective_department: Department | None
+    history: list[TriageRecordRead]
     created_at: datetime
     updated_at: datetime
 
