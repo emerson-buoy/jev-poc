@@ -28,6 +28,10 @@ Copy `.env.example` to `.env`. Every variable is optional.
 | `AI_GATEWAY_EVALUATE_URL`  | `https://ai-gateway.vercel.sh/v1/evaluate`  | Gateway evaluate endpoint                  |
 | `JEV_MODEL_ID`             | `typesafe-ai/jev`                           | Model id at the gateway                    |
 | `DATABASE_URL`             | `sqlite:///./jev.db`                        | SQLModel connection string                 |
+| `TRIAGE_MAX_ATTEMPTS`      | `3`                                         | Provider calls per triage, incl. retries   |
+| `TRIAGE_DEADLINE_SECONDS`  | `10`                                        | Total budget for one triage, all attempts  |
+| `TRIAGE_CONNECT_TIMEOUT_SECONDS` | `3`                                   | Per attempt connect timeout                |
+| `TRIAGE_READ_TIMEOUT_SECONDS` | `8`                                      | Per attempt read timeout, capped by budget |
 
 `auto` picks `typesafe` when a TypeSafe key is set, else `jev` when a gateway
 key is set, else `mock` with a warning. A forced provider without its key fails

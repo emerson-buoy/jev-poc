@@ -2,6 +2,7 @@ import httpx
 import pytest
 import respx
 
+from app.triage.http import RetryPolicy
 from app.triage.jev import GATEWAY_EVALUATE_URL, JevTriageProvider
 from app.triage.port import MalformedResponse, TicketContent, TriageError
 
@@ -23,7 +24,9 @@ GATEWAY_RESPONSE = {
     "providerMetadata": {"typesafe": {"confidence": {"department": 0.8, "urgency": 0.6}}},
 }
 
-provider = JevTriageProvider(api_key="k", model_id="typesafe-ai/jev")
+provider = JevTriageProvider(
+    api_key="k", model_id="typesafe-ai/jev", retry=RetryPolicy(max_attempts=1)
+)
 content = TicketContent(title="Charged twice", description="Please refund the duplicate.")
 
 
