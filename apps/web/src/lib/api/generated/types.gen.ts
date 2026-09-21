@@ -243,6 +243,20 @@ export type ReadMetaResponses = {
 
 export type ReadMetaResponse = ReadMetaResponses[keyof ReadMetaResponses];
 
+export type StreamEventsData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/events';
+};
+
+export type StreamEventsResponses = {
+    /**
+     * Successful Response
+     */
+    200: unknown;
+};
+
 export type ListTicketsData = {
     body?: never;
     path?: never;

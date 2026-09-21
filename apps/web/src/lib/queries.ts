@@ -1,3 +1,4 @@
+import { useEffect } from 'react'
 import { queryOptions, useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import type { TicketCreate, TicketRead, TicketStatus, TicketUpdate } from '@/lib/api/generated'
@@ -25,6 +26,21 @@ export const metaQuery = queryOptions({
 function useInvalidateTickets() {
   const queryClient = useQueryClient()
   return () => queryClient.invalidateQueries({ queryKey: ticketsQuery.queryKey })
+}
+
+export const EVENTS_URL = '/api/events'
+export const TICKETS_CHANGED = 'tickets.changed'
+
+export function useTicketEvents() {
+  const queryClient = useQueryClient()
+  useEffect(() => {
+    if (typeof EventSource === 'undefined') return
+    const source = new EventSource(EVENTS_URL)
+    const refetch = () => queryClient.invalidateQueries({ queryKey: ticketsQuery.queryKey })
+    source.addEventListener('open', refetch)
+    source.addEventListener(TICKETS_CHANGED, refetch)
+    return () => source.close()
+  }, [queryClient])
 }
 
 function useInvalidateTriage() {

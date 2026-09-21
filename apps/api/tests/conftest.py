@@ -4,6 +4,7 @@ from sqlalchemy.pool import StaticPool
 from sqlmodel import Session, SQLModel, create_engine
 
 from app.db import get_session
+from app.events import Broadcaster, get_broadcaster
 from app.main import create_app
 from app.seed import seed_tickets
 from app.triage.circuit import CircuitBreaker
@@ -38,7 +39,12 @@ def circuit() -> CircuitBreaker:
 
 
 @pytest.fixture
-def client(engine, provider, circuit):
+def broadcaster() -> Broadcaster:
+    return Broadcaster()
+
+
+@pytest.fixture
+def client(engine, provider, circuit, broadcaster):
     app = create_app(seed=False)
 
     def override_session():
@@ -48,6 +54,7 @@ def client(engine, provider, circuit):
     app.dependency_overrides[get_session] = override_session
     app.dependency_overrides[get_provider] = lambda: provider
     app.dependency_overrides[get_circuit] = lambda: circuit
+    app.dependency_overrides[get_broadcaster] = lambda: broadcaster
     with Session(engine) as session:
         seed_tickets(session)
     with TestClient(app) as client:

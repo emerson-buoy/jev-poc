@@ -45,6 +45,7 @@ so the app-level file wins.
 | Method   | Path                      | Behaviour                                                   |
 | -------- | ------------------------- | ----------------------------------------------------------- |
 | `GET`    | `/meta`                   | Active provider, whether it is the mock, circuit state      |
+| `GET`    | `/events`                 | Server-sent events: `tickets.changed` with `{id, action}` after every write |
 | `GET`    | `/tickets`                | All tickets, oldest first                                   |
 | `POST`   | `/tickets`                | Create in `new`                                             |
 | `GET`    | `/tickets/{id}`           | One ticket                                                  |
