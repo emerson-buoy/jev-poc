@@ -1,5 +1,6 @@
 import pytest
 
+from app.triage.circuit import CircuitBreaker
 from app.triage.port import (
     MalformedResponse,
     ProviderRejected,
@@ -10,7 +11,7 @@ from app.triage.port import (
 
 def test_meta_reports_mock_provider(client):
     body = client.get("/meta").json()
-    assert body == {"provider": "mock", "mock": True}
+    assert body == {"provider": "mock", "mock": True, "circuit": "closed"}
 
 
 def test_seeded_tickets_span_all_columns(client):
@@ -264,3 +265,31 @@ def test_failed_triage_from_new_leaves_the_card_in_new(client):
     assert body["status"] == "new"
     assert body["triage"] is None
     assert body["history"] == []
+
+
+class CountingUnavailable:
+    name = "mock"
+
+    def __init__(self) -> None:
+        self.calls = 0
+
+    def evaluate(self, content: TicketContent):
+        self.calls += 1
+        raise ProviderUnavailable("down")
+
+    def close(self) -> None:
+        return None
+
+
+@pytest.mark.parametrize("provider", [CountingUnavailable()])
+@pytest.mark.parametrize("circuit", [CircuitBreaker(failure_threshold=2, cooldown_seconds=30)])
+def test_open_circuit_fails_fast_and_shows_on_meta(client, provider, circuit):
+    created = client.post("/tickets", json={"title": "A", "description": "b"}).json()
+    move = {"status": "triaged"}
+    assert client.post(f"/tickets/{created['id']}/move", json=move).status_code == 503
+    assert client.post(f"/tickets/{created['id']}/move", json=move).status_code == 503
+    assert client.get("/meta").json()["circuit"] == "open"
+    res = client.post(f"/tickets/{created['id']}/move", json=move)
+    assert res.status_code == 503
+    assert res.headers["retry-after"] == "30"
+    assert provider.calls == 2

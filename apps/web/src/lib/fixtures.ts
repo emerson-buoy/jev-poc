@@ -68,5 +68,6 @@ export const tickets: TicketRead[] = [
   }),
 ]
 
-export const mockMeta: MetaRead = { provider: 'mock', mock: true }
-export const jevMeta: MetaRead = { provider: 'jev', mock: false }
+export const mockMeta: MetaRead = { provider: 'mock', mock: true, circuit: 'closed' }
+export const jevMeta: MetaRead = { provider: 'typesafe', mock: false, circuit: 'closed' }
+export const openCircuitMeta: MetaRead = { provider: 'typesafe', mock: false, circuit: 'open' }

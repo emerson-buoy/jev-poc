@@ -4,6 +4,7 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field
 
 from app.models import DiscardReason, TicketStatus
+from app.triage.circuit import CircuitState
 from app.triage.questions import DEPARTMENTS
 from app.triage.service import TriageResult
 
@@ -54,3 +55,4 @@ class TicketRead(BaseModel):
 class MetaRead(BaseModel):
     provider: str
     mock: bool
+    circuit: CircuitState

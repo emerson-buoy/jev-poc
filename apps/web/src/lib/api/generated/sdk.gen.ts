@@ -78,7 +78,5 @@ export const moveTicket = <ThrowOnError extends boolean = false>(options: Option
 
 /**
  * Retriage Ticket
- *
- * Asks the provider again. The previous result, if any, goes to history.
  */
 export const retriageTicket = <ThrowOnError extends boolean = false>(options: Options<RetriageTicketData, ThrowOnError>): RequestResult<RetriageTicketResponses, RetriageTicketErrors, ThrowOnError> => (options.client ?? client).post<RetriageTicketResponses, RetriageTicketErrors, ThrowOnError>({ url: '/tickets/{ticket_id}/triage', ...options });

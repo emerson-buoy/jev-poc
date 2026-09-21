@@ -27,10 +27,19 @@ function useInvalidateTickets() {
   return () => queryClient.invalidateQueries({ queryKey: ticketsQuery.queryKey })
 }
 
+function useInvalidateTriage() {
+  const queryClient = useQueryClient()
+  return () =>
+    Promise.all([
+      queryClient.invalidateQueries({ queryKey: ticketsQuery.queryKey }),
+      queryClient.invalidateQueries({ queryKey: metaQuery.queryKey }),
+    ])
+}
+
 /** Optimistic column move. A rejected move (for example a failed triage) snaps the card back. */
 export function useMoveTicket() {
   const queryClient = useQueryClient()
-  const invalidate = useInvalidateTickets()
+  const invalidate = useInvalidateTriage()
   return useMutation({
     mutationFn: (data: { id: number; status: TicketStatus }) => moveTicketTo({ data }),
     onMutate: async ({ id, status }) => {
@@ -57,7 +66,7 @@ export function useMoveTicket() {
 }
 
 export function useRetriage() {
-  const invalidate = useInvalidateTickets()
+  const invalidate = useInvalidateTriage()
   return useMutation({
     mutationFn: (data: { id: number }) => retriage({ data }),
     onSuccess: (ticket: TicketRead) =>
