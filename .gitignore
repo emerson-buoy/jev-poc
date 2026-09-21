@@ -157,3 +157,6 @@ apps/web/.output/
 apps/web/.nitro/
 apps/web/.tanstack/
 apps/web/src/routeTree.gen.ts
+
+# Claude Code worktree bookkeeping
+.claude/worktrees/

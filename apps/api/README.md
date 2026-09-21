@@ -44,7 +44,7 @@ so the app-level file wins.
 | `GET`    | `/tickets/{id}`           | One ticket                                                  |
 | `PATCH`  | `/tickets/{id}`           | Update title, description or `department_override`          |
 | `DELETE` | `/tickets/{id}`           | Remove                                                      |
-| `POST`   | `/tickets/{id}/move`      | Set status. Into `triaged` runs triage once; into `new` discards it; 502 on failure |
+| `POST`   | `/tickets/{id}/move`      | Set status. Into `triaged` runs triage once; into `new` discards it. 503 with `Retry-After` if the provider is unavailable, 502 if it rejects or answers unusably |
 | `POST`   | `/tickets/{id}/triage`    | Re-run triage; the previous result goes to history          |
 
 A ticket carries `triage` (Jev's result with probabilities, confidence and the
@@ -57,7 +57,11 @@ with their ticket.
 
 ## Triage providers
 
-`app/triage/port.py` defines the contract. Three adapters implement it:
+`app/triage/port.py` defines the contract and the failure types
+(`ProviderUnavailable`, `ProviderRejected`, `MalformedResponse`).
+`app/triage/http.py` is the single HTTP evaluator both Jev adapters use: one
+client with the bearer header and timeout, error classification, closed on
+shutdown. Three adapters implement the contract:
 
 - `typesafe.py` posts the ticket as state with three questions (department
   choice, five-level urgency score, refund yes/no) to TypeSafe's
@@ -75,7 +79,7 @@ with their ticket.
 ## Develop
 
 ```bash
-uv run pytest -q                       # 50 tests, no network
+uv run pytest -q                       # 79 tests, no network
 uv run ruff check . && uv run ruff format .
 uv run python -m scripts.export_openapi   # writes openapi.json for apps/web
 ```

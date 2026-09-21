@@ -25,7 +25,7 @@ A Kanban board (`apps/web`, TanStack Start) backed by a FastAPI service
   departments. Department, urgency and refund are badges on the card.
 - Triage runs when a card first enters Triaged. Auto-triage on create and
   realtime updates are deferred in `TODO.md`.
-- A failed triage rejects the move (HTTP 502 from the API, optimistic update
+- A failed triage rejects the move (HTTP 503 with Retry-After when the provider is unavailable, 502 otherwise; optimistic update
   rolled back in the UI, toast shown). A card in Triaged always has a result.
 - Moving a card into New discards the active triage: the result and the
   human override are copied to `TriageRecord` (reason `moved_to_new`) and

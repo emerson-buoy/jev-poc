@@ -35,7 +35,7 @@ you want to change one, it is a product decision, not a refactor.
 | Monorepo tooling | pnpm workspaces plus uv, root scripts with concurrently, no Turborepo or Nx | Two apps in two languages gain little from a task graph |
 | Persistence | SQLite through SQLModel | Zero infrastructure, survives restarts |
 | Triage trigger | On first move into Triaged; auto-triage on create deferred | Emerson: "when I move to triage for now; then automatic" |
-| Triage failure | Move rejected, card snaps back, toast | A card in Triaged always has a result |
+| Triage failure | Move rejected, card snaps back, toast; 503 with Retry-After for transient provider failures, 502 otherwise | A card in Triaged always has a result, and the UI can tell "retry" from "bug" |
 | Move back to New | Triage discarded into history, override cleared | Emerson asked for discard with historical data kept and shown collapsed |
 | Re-triage | Archives the replaced result, clears override | Keeps history complete |
 | Seeds | Ten tickets across all columns, static fixture results marked `provider: seed` | Works with no provider, same fixtures serve tests |
@@ -124,7 +124,7 @@ timestamp recorded.
 
 | Check | Status |
 | --- | --- |
-| API pytest | 50 pass, no network |
+| API pytest | 79 pass, no network |
 | Web vitest | 19 pass, API mocked |
 | Ruff, ESLint, tsc, build | clean, via `pnpm lint`, `pnpm --filter web typecheck`, `pnpm --filter web build` |
 | Browser | board, drag into Triaged, detail panel, override, history verified in Chrome |
