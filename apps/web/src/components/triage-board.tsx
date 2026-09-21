@@ -7,12 +7,13 @@ import { NewTicketDialog } from '@/components/new-ticket-dialog'
 import { TicketDetail } from '@/components/ticket-detail'
 import type { TicketStatus } from '@/lib/api/generated'
 import { COLUMNS, groupByStatus } from '@/lib/board'
-import { metaQuery, ticketsQuery, useMoveTicket } from '@/lib/queries'
+import { metaQuery, ticketsQuery, useMoveTicket, useTicketEvents } from '@/lib/queries'
 
 export function TriageBoard() {
   const tickets = useQuery(ticketsQuery)
   const meta = useQuery(metaQuery)
   const move = useMoveTicket()
+  useTicketEvents()
   const [selectedId, setSelectedId] = useState<number | null>(null)
 
   useEffect(

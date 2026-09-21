@@ -46,7 +46,7 @@ you want to change one, it is a product decision, not a refactor.
 | API contract | Client generated from FastAPI's OpenAPI with `@hey-api/openapi-ts` | One source of truth in the Pydantic models |
 | Env layout | Each app owns its `.env` and `.env.example`; API also reads a repo-root `.env` | Emerson: "each app has its own" |
 | Tests | pytest with the mock adapter; Vitest plus Testing Library with server functions mocked; no Playwright | Nothing hits the network |
-| Realtime | Deferred to `TODO.md`; Query refetches on focus and after mutations | Emerson: "hmmm add to TODO" |
+| Realtime | REST for writes plus server-sent events for change notices (`GET /events`, proxied by a Start server route at `/api/events`); WebSockets rejected for now | Emerson, 2026-09-21: the POC is about Jev classification, so the write path stays as is and only server-to-browser notification is added. Revisit WebSockets only if presence, live cursors or collaborative editing become features |
 | Urgency rubric | Time pressure and harm weighed together; wrong charges and data loss reach level 4 | A "$500 wrongly debited" ticket scored 2/5 under the original time-pressure-only rubric; Emerson chose to fold harm in rather than add a fourth question |
 
 He prefers framework conventions over bespoke setup for POCs ("this is a
@@ -189,6 +189,18 @@ call in a `CircuitBreaker` on `app.state`: after
 for `TRIAGE_CIRCUIT_COOLDOWN_SECONDS`, calls fail fast with 503 and
 `Retry-After`, then one probe is let through. `GET /meta` reports `circuit`
 and the board shows a red banner while it is open.
+
+## Live updates
+
+`app/events.py` is an in-process broadcaster: one bounded asyncio queue per
+subscriber, publish from the threadpool through `call_soon_threadsafe`, a
+subscriber whose queue is full is dropped rather than blocking the writer.
+`GET /events` yields `tickets.changed` events with `{id, action}` and an
+incrementing id, `retry: 3000` up front, keep-alive comments from FastAPI.
+Clients carry no payload state: they refetch on every event and on open, so
+reconnects need no replay buffer. Limit: one API process (one uvicorn worker,
+one container); a second worker would split subscribers. Replace the
+broadcaster with Redis pub/sub or Postgres LISTEN before scaling out.
 
 ## Open items
 

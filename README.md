@@ -99,6 +99,9 @@ to Jev's suggestion. The card shows the human choice with a `*`. Jev's
 original answer stays visible.
 - **Forward moves** between Triaged, In progress and Done never touch the
 result.
+- **Every open browser updates live.** The API pushes a change notice over
+server-sent events after each write, and each board refetches on it and on
+every reconnect. Writes stay plain REST.
 
 
 
@@ -155,8 +158,9 @@ calls the yes/no type `noul` and returns a confidence per answer.
 (argmax level, mean, refund threshold, provider, timestamp).
 - `app/triage/factory.py`: picks the provider from the environment at startup.
 
-Endpoints: `GET /meta`, `GET|POST /tickets`, `GET|PATCH|DELETE /tickets/{id}`,
-`POST /tickets/{id}/move`, `POST /tickets/{id}/triage`. A failed triage
+Endpoints: `GET /meta`, `GET /events`, `GET|POST /tickets`,
+`GET|PATCH|DELETE /tickets/{id}`, `POST /tickets/{id}/move`,
+`POST /tickets/{id}/triage`. A failed triage
 answers 503 with `Retry-After` when the provider is unavailable and 502 when
 it rejects the request or returns something unusable; the upstream body goes
 to the log, never to the browser. See `apps/api/README.md`.
@@ -167,6 +171,16 @@ in `src/server/tickets.ts` wrap a client generated from the API's OpenAPI
 document with `@hey-api/openapi-ts`. Query options and mutations, including
 the optimistic move with rollback, live in `src/lib/queries.ts`. See
 `apps/web/README.md`.
+
+**Live updates**: `GET /events` on the API is a server-sent event stream.
+`app/events.py` holds an in-process broadcaster (one asyncio queue per
+subscriber, bounded, thread-safe publish); every router write publishes
+`tickets.changed` with `{id, action}` after its commit. The browser never
+calls FastAPI, so the Start server route `src/routes/api/events.ts` pipes the
+stream through at `/api/events`, and `useTicketEvents()` in
+`src/lib/queries.ts` opens an `EventSource` and invalidates the tickets query
+on every event and on open. One API process only; a Redis or Postgres
+LISTEN broadcaster would replace `app/events.py` for more.
 
 **Docker**: `apps/api/Dockerfile` (uv image, healthcheck on `/meta`, SQLite
 volume), `apps/web/Dockerfile` (built from the repo root, ships the nitro
@@ -180,7 +194,7 @@ and typecheck, and `docker compose build` on every push and pull request.
 ```bash
 pnpm install && uv sync --directory apps/api
 pnpm dev             # both dev servers with hot reload
-pnpm test            # pytest (79) then vitest (19), no network
+pnpm test            # pytest then vitest, no network
 pnpm lint            # ruff then eslint
 pnpm export:openapi  # regenerate apps/api/openapi.json after an API change
 pnpm generate:client # regenerate the web client from it

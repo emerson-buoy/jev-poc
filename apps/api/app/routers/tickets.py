@@ -6,6 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlmodel import Session, col, select
 
 from app.db import get_session
+from app.events import Broadcaster, BroadcasterDep, TicketAction
 from app.models import DiscardReason, Ticket, TicketStatus, TriageRecord, utcnow
 from app.schemas import MoveRequest, TicketCreate, TicketRead, TicketUpdate, TriageRecordRead
 from app.triage.port import ProviderRejected, ProviderUnavailable, TicketContent, TriageError
@@ -96,11 +97,14 @@ def _http_error(error: TriageError) -> HTTPException:
     )
 
 
-def save(session: Session, ticket: Ticket) -> TicketRead:
+def save(
+    session: Session, ticket: Ticket, broadcaster: Broadcaster, action: TicketAction
+) -> TicketRead:
     ticket.updated_at = utcnow()
     session.add(ticket)
     session.commit()
     session.refresh(ticket)
+    broadcaster.publish(ticket.id, action)
     return read(session, ticket)
 
 
@@ -111,8 +115,8 @@ def list_tickets(session: SessionDep) -> list[TicketRead]:
 
 
 @router.post("", response_model=TicketRead, status_code=status.HTTP_201_CREATED)
-def create_ticket(body: TicketCreate, session: SessionDep) -> TicketRead:
-    return save(session, Ticket(title=body.title, description=body.description))
+def create_ticket(body: TicketCreate, session: SessionDep, events: BroadcasterDep) -> TicketRead:
+    return save(session, Ticket(title=body.title, description=body.description), events, "created")
 
 
 @router.get("/{ticket_id}", response_model=TicketRead)
@@ -121,37 +125,47 @@ def read_ticket(ticket: TicketDep, session: SessionDep) -> TicketRead:
 
 
 @router.patch("/{ticket_id}", response_model=TicketRead)
-def update_ticket(ticket: TicketDep, body: TicketUpdate, session: SessionDep) -> TicketRead:
+def update_ticket(
+    ticket: TicketDep, body: TicketUpdate, session: SessionDep, events: BroadcasterDep
+) -> TicketRead:
     for field, value in body.model_dump(exclude_unset=True).items():
         setattr(ticket, field, value)
-    return save(session, ticket)
+    return save(session, ticket, events, "updated")
 
 
 @router.delete("/{ticket_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_ticket(ticket: TicketDep, session: SessionDep) -> None:
+def delete_ticket(ticket: TicketDep, session: SessionDep, events: BroadcasterDep) -> None:
     for record in session.exec(select(TriageRecord).where(TriageRecord.ticket_id == ticket.id)):
         session.delete(record)
     session.delete(ticket)
     session.commit()
+    events.publish(ticket.id, "deleted")
 
 
 @router.post("/{ticket_id}/move", response_model=TicketRead)
 def move_ticket(
-    ticket: TicketDep, body: MoveRequest, session: SessionDep, triage: TriageServiceDep
+    ticket: TicketDep,
+    body: MoveRequest,
+    session: SessionDep,
+    triage: TriageServiceDep,
+    events: BroadcasterDep,
 ) -> TicketRead:
-    """Into Triaged runs triage once. Into New discards the result to history. Else free."""
+    action: TicketAction = "moved"
     if body.status == TicketStatus.TRIAGED and ticket.triage is None:
         run_triage(ticket, triage)
+        action = "triaged"
     if body.status == TicketStatus.NEW:
         discard_triage(session, ticket, DiscardReason.MOVED_TO_NEW)
     ticket.status = body.status
-    return save(session, ticket)
+    return save(session, ticket, events, action)
 
 
 @router.post("/{ticket_id}/triage", response_model=TicketRead)
-def retriage_ticket(ticket: TicketDep, session: SessionDep, triage: TriageServiceDep) -> TicketRead:
+def retriage_ticket(
+    ticket: TicketDep, session: SessionDep, triage: TriageServiceDep, events: BroadcasterDep
+) -> TicketRead:
     discard_triage(session, ticket, DiscardReason.RETRIAGED)
     run_triage(ticket, triage)
     if ticket.status == TicketStatus.NEW:
         ticket.status = TicketStatus.TRIAGED
-    return save(session, ticket)
+    return save(session, ticket, events, "triaged")

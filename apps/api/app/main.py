@@ -1,3 +1,4 @@
+import asyncio
 import logging
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
@@ -8,7 +9,8 @@ from sqlmodel import Session
 
 from app.config import get_settings
 from app.db import get_engine, init_db
-from app.routers import meta, tickets
+from app.events import Broadcaster
+from app.routers import events, meta, tickets
 from app.seed import seed_tickets
 from app.triage.circuit import CircuitBreaker
 from app.triage.factory import build_provider
@@ -25,6 +27,8 @@ def create_app(seed: bool = True) -> FastAPI:
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         settings = get_settings()
+        app.state.broadcaster = Broadcaster()
+        app.state.broadcaster.bind(asyncio.get_running_loop())
         app.state.triage_provider = build_provider(settings)
         app.state.circuit = CircuitBreaker(
             failure_threshold=settings.triage_circuit_failures,
@@ -49,6 +53,7 @@ def create_app(seed: bool = True) -> FastAPI:
         generate_unique_id_function=operation_id,
     )
     app.include_router(meta.router)
+    app.include_router(events.router)
     app.include_router(tickets.router)
     return app
 
