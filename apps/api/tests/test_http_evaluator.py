@@ -2,7 +2,7 @@ import httpx
 import pytest
 import respx
 
-from app.triage.http import HttpEvaluator
+from app.triage.http import HttpEvaluator, RetryPolicy
 from app.triage.port import (
     MalformedResponse,
     ProviderRejected,
@@ -15,7 +15,9 @@ URL = "https://example.test/v1/evaluate"
 
 @pytest.fixture
 def evaluator():
-    evaluator = HttpEvaluator(url=URL, api_key="k", label="Example")
+    evaluator = HttpEvaluator(
+        url=URL, api_key="k", label="Example", retry=RetryPolicy(max_attempts=1)
+    )
     yield evaluator
     evaluator.close()
 
@@ -110,3 +112,125 @@ def test_close_closes_the_client():
     assert not evaluator.is_closed
     evaluator.close()
     assert evaluator.is_closed
+
+
+class FakeTime:
+    def __init__(self) -> None:
+        self.now = 0.0
+        self.sleeps: list[float] = []
+
+    def clock(self) -> float:
+        return self.now
+
+    def sleep(self, seconds: float) -> None:
+        self.sleeps.append(seconds)
+        self.now += seconds
+
+
+def retrying(time: FakeTime, **policy) -> HttpEvaluator:
+    return HttpEvaluator(
+        url=URL,
+        api_key="k",
+        label="Example",
+        retry=RetryPolicy(**{"max_attempts": 3, "deadline_seconds": 10.0, **policy}),
+        sleep=time.sleep,
+        clock=time.clock,
+        jitter=lambda cap: cap,
+    )
+
+
+@respx.mock
+def test_retries_unavailable_then_succeeds():
+    time = FakeTime()
+    route = respx.post(URL).mock(
+        side_effect=[httpx.Response(503), httpx.Response(200, json={"answers": {}})]
+    )
+    assert retrying(time).post({}) == {"answers": {}}
+    assert route.call_count == 2
+    assert len(time.sleeps) == 1
+
+
+@respx.mock
+def test_backoff_is_exponential_up_to_the_cap():
+    time = FakeTime()
+    respx.post(URL).mock(return_value=httpx.Response(503))
+    policy = {"max_attempts": 4, "base_delay_seconds": 0.5, "max_delay_seconds": 1.5}
+    with pytest.raises(ProviderUnavailable):
+        retrying(time, **policy).post({})
+    assert time.sleeps == [0.5, 1.0, 1.5]
+
+
+@respx.mock
+def test_gives_up_after_max_attempts():
+    time = FakeTime()
+    route = respx.post(URL).mock(return_value=httpx.Response(529))
+    with pytest.raises(ProviderUnavailable, match="529"):
+        retrying(time).post({})
+    assert route.call_count == 3
+    assert len(time.sleeps) == 2
+
+
+@respx.mock
+def test_retry_after_sets_the_delay():
+    time = FakeTime()
+    respx.post(URL).mock(
+        side_effect=[
+            httpx.Response(429, headers={"Retry-After": "3"}),
+            httpx.Response(200, json={}),
+        ]
+    )
+    retrying(time).post({})
+    assert time.sleeps == [3.0]
+
+
+@respx.mock
+def test_does_not_sleep_past_the_deadline():
+    time = FakeTime()
+    route = respx.post(URL).mock(return_value=httpx.Response(429, headers={"Retry-After": "20"}))
+    with pytest.raises(ProviderUnavailable, match="429"):
+        retrying(time).post({})
+    assert route.call_count == 1
+    assert time.sleeps == []
+
+
+@respx.mock
+def test_rejections_are_not_retried():
+    time = FakeTime()
+    route = respx.post(URL).mock(return_value=httpx.Response(401, json={"message": "no"}))
+    with pytest.raises(ProviderRejected):
+        retrying(time).post({})
+    assert route.call_count == 1
+
+
+@respx.mock
+def test_malformed_success_is_not_retried():
+    time = FakeTime()
+    route = respx.post(URL).mock(return_value=httpx.Response(200, text="<html>"))
+    with pytest.raises(MalformedResponse):
+        retrying(time).post({})
+    assert route.call_count == 1
+
+
+@respx.mock
+def test_each_attempt_is_bounded_by_the_remaining_budget():
+    time = FakeTime()
+
+    def slow_failure(request):
+        time.now += 6.0
+        return httpx.Response(503)
+
+    route = respx.post(URL).mock(side_effect=slow_failure)
+    evaluator = HttpEvaluator(
+        url=URL,
+        api_key="k",
+        label="Example",
+        timeout=httpx.Timeout(connect=3.0, read=8.0, write=8.0, pool=8.0),
+        retry=RetryPolicy(max_attempts=3, deadline_seconds=10.0, base_delay_seconds=0.0),
+        sleep=time.sleep,
+        clock=time.clock,
+        jitter=lambda cap: cap,
+    )
+    with pytest.raises(ProviderUnavailable):
+        evaluator.post({})
+    timeouts = [call.request.extensions["timeout"]["read"] for call in route.calls]
+    assert timeouts == [8.0, 4.0]

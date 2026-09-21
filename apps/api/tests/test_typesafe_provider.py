@@ -2,6 +2,7 @@ import httpx
 import pytest
 import respx
 
+from app.triage.http import RetryPolicy
 from app.triage.port import MalformedResponse, TicketContent, TriageError
 from app.triage.typesafe import TypeSafeTriageProvider
 
@@ -29,7 +30,9 @@ TYPESAFE_RESPONSE = {
     "usage": {"input_tokens": 120, "output_tokens": 12},
 }
 
-provider = TypeSafeTriageProvider(api_key="k", model_id="jev-latest", base_url=BASE_URL)
+provider = TypeSafeTriageProvider(
+    api_key="k", model_id="jev-latest", base_url=BASE_URL, retry=RetryPolicy(max_attempts=1)
+)
 content = TicketContent(title="Charged twice", description="Please refund the duplicate.")
 
 

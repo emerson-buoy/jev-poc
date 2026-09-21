@@ -1,6 +1,8 @@
 from dataclasses import asdict
 
-from app.triage.http import HttpEvaluator
+import httpx
+
+from app.triage.http import DEFAULT_TIMEOUT, HttpEvaluator, RetryPolicy
 from app.triage.port import (
     BooleanAnswer,
     ChoiceAnswer,
@@ -18,10 +20,17 @@ class JevTriageProvider:
     name = "jev"
 
     def __init__(
-        self, api_key: str, model_id: str, evaluate_url: str = GATEWAY_EVALUATE_URL
+        self,
+        api_key: str,
+        model_id: str,
+        evaluate_url: str = GATEWAY_EVALUATE_URL,
+        timeout: httpx.Timeout = DEFAULT_TIMEOUT,
+        retry: RetryPolicy | None = None,
     ) -> None:
         self._model_id = model_id
-        self._http = HttpEvaluator(url=evaluate_url, api_key=api_key, label="AI Gateway")
+        self._http = HttpEvaluator(
+            url=evaluate_url, api_key=api_key, label="AI Gateway", timeout=timeout, retry=retry
+        )
 
     def evaluate(self, content: TicketContent) -> TriageEvaluation:
         payload = {"model": self._model_id, "state": asdict(content), "questions": QUESTIONS}

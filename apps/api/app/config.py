@@ -18,6 +18,10 @@ class Settings(BaseSettings):
     jev_model_id: str = "typesafe-ai/jev"
     triage_provider: TriageProviderName = "auto"
     database_url: str = "sqlite:///./jev.db"
+    triage_max_attempts: int = 3
+    triage_deadline_seconds: float = 10.0
+    triage_connect_timeout_seconds: float = 3.0
+    triage_read_timeout_seconds: float = 8.0
 
 
 @lru_cache

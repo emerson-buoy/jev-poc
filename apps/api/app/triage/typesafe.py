@@ -1,6 +1,8 @@
 from dataclasses import asdict
 
-from app.triage.http import HttpEvaluator
+import httpx
+
+from app.triage.http import DEFAULT_TIMEOUT, HttpEvaluator, RetryPolicy
 from app.triage.port import (
     BooleanAnswer,
     ChoiceAnswer,
@@ -24,11 +26,20 @@ class TypeSafeTriageProvider:
     name = "typesafe"
 
     def __init__(
-        self, api_key: str, model_id: str = DEFAULT_MODEL_ID, base_url: str = DEFAULT_BASE_URL
+        self,
+        api_key: str,
+        model_id: str = DEFAULT_MODEL_ID,
+        base_url: str = DEFAULT_BASE_URL,
+        timeout: httpx.Timeout = DEFAULT_TIMEOUT,
+        retry: RetryPolicy | None = None,
     ) -> None:
         self._model_id = model_id
         self._http = HttpEvaluator(
-            url=f"{base_url.rstrip('/')}/systemone", api_key=api_key, label="TypeSafe"
+            url=f"{base_url.rstrip('/')}/systemone",
+            api_key=api_key,
+            label="TypeSafe",
+            timeout=timeout,
+            retry=retry,
         )
 
     def evaluate(self, content: TicketContent) -> TriageEvaluation:
