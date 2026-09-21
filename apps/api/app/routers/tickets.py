@@ -150,17 +150,8 @@ def move_ticket(
 
 @router.post("/{ticket_id}/triage", response_model=TicketRead)
 def retriage_ticket(ticket: TicketDep, session: SessionDep, triage: TriageServiceDep) -> TicketRead:
-    """Asks the provider again. The previous result, if any, goes to history."""
-    previous = (ticket.triage, ticket.department_override)
+    discard_triage(session, ticket, DiscardReason.RETRIAGED)
     run_triage(ticket, triage)
-    if previous[0] is not None:
-        session.add(
-            TriageRecord(
-                ticket_id=ticket.id,
-                result=previous[0],
-                department_override=previous[1],
-                reason=DiscardReason.RETRIAGED,
-            )
-        )
-        ticket.department_override = None
+    if ticket.status == TicketStatus.NEW:
+        ticket.status = TicketStatus.TRIAGED
     return save(session, ticket)

@@ -91,8 +91,9 @@ human override go to a history table and are never consulted again. The
 card reads "Not triaged, 1 discarded" and the panel lists past results
 collapsed under "Previous triages". Dragging it into Triaged again asks
 Jev again.
-- **Re-triage** from the panel asks Jev again and archives the result it
-replaces.
+- **Triage from the panel** asks Jev and archives the result it replaces.
+On a card in New it also moves the card to Triaged; cards in later columns
+stay where they are.
 - **Override.** The panel's department select stores a human decision next
 to Jev's suggestion. The card shows the human choice with a `*`. Jev's
 original answer stays visible.

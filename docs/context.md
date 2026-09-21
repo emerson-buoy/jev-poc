@@ -37,7 +37,7 @@ you want to change one, it is a product decision, not a refactor.
 | Triage trigger | On first move into Triaged; auto-triage on create deferred | Emerson: "when I move to triage for now; then automatic" |
 | Triage failure | Move rejected, card snaps back, toast; 503 with Retry-After for transient provider failures, 502 otherwise | A card in Triaged always has a result, and the UI can tell "retry" from "bug" |
 | Move back to New | Triage discarded into history, override cleared | Emerson asked for discard with historical data kept and shown collapsed |
-| Re-triage | Archives the replaced result, clears override | Keeps history complete |
+| Re-triage | Archives the replaced result, clears override; from New the card moves to Triaged, later columns stay | Keeps history complete; Emerson on 2026-09-21: cards triaged from the panel "today they dont" move, and New must never hold a result |
 | Seeds | Ten tickets across all columns, static fixture results marked `provider: seed` | Works with no provider, same fixtures serve tests |
 | Override | Human department override stored beside Jev's suggestion; `effective_department` = override or suggestion | Shows disagreement, which is useful demo material |
 | Detail panel | Description, probability bars, confidence, provider, override select, re-triage, delete, collapsed history | Where the probabilities become visible |

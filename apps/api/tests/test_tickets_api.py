@@ -231,3 +231,36 @@ def test_delete_ticket_removes_its_history(client, session):
 def test_unknown_ticket_is_404(client):
     assert client.get("/tickets/9999").status_code == 404
     assert client.post("/tickets/9999/move", json={"status": "done"}).status_code == 404
+
+
+def test_triage_from_new_moves_the_card_to_triaged(client):
+    created = client.post("/tickets", json={"title": "Outage", "description": "500 error"}).json()
+    body = client.post(f"/tickets/{created['id']}/triage").json()
+    assert body["status"] == "triaged"
+    assert body["triage"]["provider"] == "mock"
+    assert body["history"] == []
+
+
+def test_retriage_keeps_a_later_column(client):
+    done = next(t for t in client.get("/tickets").json() if t["status"] == "done")
+    body = client.post(f"/tickets/{done['id']}/triage").json()
+    assert body["status"] == "done"
+    assert body["history"][0]["reason"] == "retriaged"
+
+
+def test_retriage_clears_the_override_and_archives_it(client):
+    seeded = next(t for t in client.get("/tickets").json() if t["status"] == "triaged")
+    client.patch(f"/tickets/{seeded['id']}", json={"department_override": "general"})
+    body = client.post(f"/tickets/{seeded['id']}/triage").json()
+    assert body["department_override"] is None
+    assert body["history"][0]["department_override"] == "general"
+
+
+@pytest.mark.parametrize("provider", [FailingProvider(ProviderUnavailable("timed out"))])
+def test_failed_triage_from_new_leaves_the_card_in_new(client):
+    created = client.post("/tickets", json={"title": "A", "description": "b"}).json()
+    assert client.post(f"/tickets/{created['id']}/triage").status_code == 503
+    body = client.get(f"/tickets/{created['id']}").json()
+    assert body["status"] == "new"
+    assert body["triage"] is None
+    assert body["history"] == []
