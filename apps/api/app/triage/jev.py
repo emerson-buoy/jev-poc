@@ -1,9 +1,6 @@
-"""Adapter over Vercel AI Gateway's evaluate endpoint for TypeSafe AI's Jev."""
-
 from dataclasses import asdict
 
-import httpx
-
+from app.triage.http import HttpEvaluator
 from app.triage.port import (
     BooleanAnswer,
     ChoiceAnswer,
@@ -15,7 +12,6 @@ from app.triage.port import (
 from app.triage.questions import QUESTIONS
 
 GATEWAY_EVALUATE_URL = "https://ai-gateway.vercel.sh/v1/evaluate"
-REQUEST_TIMEOUT_SECONDS = 30.0
 
 
 class JevTriageProvider:
@@ -25,31 +21,14 @@ class JevTriageProvider:
         self, api_key: str, model_id: str, evaluate_url: str = GATEWAY_EVALUATE_URL
     ) -> None:
         self._model_id = model_id
-        self._url = evaluate_url
-        # Auth is set once on the client, so every call inherits it.
-        self._client = httpx.Client(
-            headers={"Authorization": f"Bearer {api_key}"}, timeout=REQUEST_TIMEOUT_SECONDS
-        )
+        self._http = HttpEvaluator(url=evaluate_url, api_key=api_key, label="AI Gateway")
 
     def evaluate(self, content: TicketContent) -> TriageEvaluation:
         payload = {"model": self._model_id, "state": asdict(content), "questions": QUESTIONS}
-        try:
-            response = self._client.post(self._url, json=payload)
-        except httpx.HTTPError as error:
-            raise TriageError(f"Could not reach the AI Gateway: {error}") from error
-        if response.is_error:
-            raise TriageError(_error_message(response))
-        return _parse(response.json())
+        return _parse(self._http.post(payload))
 
-
-def _error_message(response: httpx.Response) -> str:
-    try:
-        body = response.json()
-        detail = body.get("error", body)
-        message = detail.get("message") if isinstance(detail, dict) else None
-    except ValueError:
-        message = None
-    return f"AI Gateway returned {response.status_code}: {message or response.text[:200]}"
+    def close(self) -> None:
+        self._http.close()
 
 
 def _parse(body: dict) -> TriageEvaluation:

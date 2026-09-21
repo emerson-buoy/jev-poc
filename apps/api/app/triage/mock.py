@@ -80,6 +80,9 @@ class MockTriageProvider:
         }
         return TriageEvaluation(department, urgency, refund, confidence)
 
+    def close(self) -> None:
+        return None
+
     def _department(self, text: str) -> ChoiceAnswer:
         hits = {
             "billing": _count(text, BILLING_WORDS),

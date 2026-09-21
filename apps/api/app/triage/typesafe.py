@@ -1,9 +1,6 @@
-"""Adapter over TypeSafe AI's own System One endpoint. Same Jev, no gateway in between."""
-
 from dataclasses import asdict
 
-import httpx
-
+from app.triage.http import HttpEvaluator
 from app.triage.port import (
     BooleanAnswer,
     ChoiceAnswer,
@@ -16,11 +13,10 @@ from app.triage.questions import QUESTIONS
 
 DEFAULT_BASE_URL = "https://api.typesafe.ai/v1"
 DEFAULT_MODEL_ID = "jev-latest"
-REQUEST_TIMEOUT_SECONDS = 30.0
+YES_NO_TYPE = "noul"
 
-# TypeSafe's wire format calls the yes/no question type "noul".
 _WIRE_QUESTIONS = {
-    key: {**q, "type": "noul"} if q["type"] == "boolean" else q for key, q in QUESTIONS.items()
+    key: {**q, "type": YES_NO_TYPE} if q["type"] == "boolean" else q for key, q in QUESTIONS.items()
 }
 
 
@@ -31,31 +27,16 @@ class TypeSafeTriageProvider:
         self, api_key: str, model_id: str = DEFAULT_MODEL_ID, base_url: str = DEFAULT_BASE_URL
     ) -> None:
         self._model_id = model_id
-        # Auth and base URL are set once on the client, so every call inherits them.
-        self._client = httpx.Client(
-            base_url=base_url.rstrip("/"),
-            headers={"Authorization": f"Bearer {api_key}"},
-            timeout=REQUEST_TIMEOUT_SECONDS,
+        self._http = HttpEvaluator(
+            url=f"{base_url.rstrip('/')}/systemone", api_key=api_key, label="TypeSafe"
         )
 
     def evaluate(self, content: TicketContent) -> TriageEvaluation:
         payload = {"model": self._model_id, "state": asdict(content), "questions": _WIRE_QUESTIONS}
-        try:
-            response = self._client.post("/systemone", json=payload)
-        except httpx.HTTPError as error:
-            raise TriageError(f"Could not reach TypeSafe: {error}") from error
-        if response.is_error:
-            raise TriageError(_error_message(response))
-        return _parse(response.json())
+        return _parse(self._http.post(payload))
 
-
-def _error_message(response: httpx.Response) -> str:
-    try:
-        body = response.json()
-        message = body.get("message") or body.get("detail") if isinstance(body, dict) else None
-    except ValueError:
-        message = None
-    return f"TypeSafe returned {response.status_code}: {message or response.text[:200]}"
+    def close(self) -> None:
+        self._http.close()
 
 
 def _parse(body: dict) -> TriageEvaluation:
@@ -77,7 +58,7 @@ def _parse(body: dict) -> TriageEvaluation:
                 score=float(urgency["score"]),
                 probabilities={int(k): float(v) for k, v in urgency["probabilities"].items()},
             ),
-            refund=BooleanAnswer(probability=float(refund["noul"])),
+            refund=BooleanAnswer(probability=float(refund[YES_NO_TYPE])),
             confidence=confidence or None,
         )
     except (KeyError, TypeError, ValueError, AttributeError) as error:
