@@ -7,9 +7,11 @@ questions without changing code, the user commits manually).
 
 ## Read first
 
-`docs/context.md` holds the full context: history, every decision with its
-reason, provider wire formats, alternatives rejected, verified state and
-operational gotchas. Read it before changing scope or providers.
+`README.md` describes how the app works and what Jev is asked.
+`docs/context.md` holds every decision with its reason, provider wire
+formats, alternatives rejected, verified state and operational gotchas. Read
+both before changing scope or providers. Past states live in git; docs
+describe the current app only.
 
 ## What this is
 
@@ -52,7 +54,6 @@ A Kanban board (`apps/web`, TanStack Start) backed by a FastAPI service
 - The web app never calls FastAPI from the browser. Server functions in
   `apps/web/src/server/tickets.ts` wrap the generated client; TanStack Query
   calls the server functions; route loaders prefetch through the QueryClient.
-- The Nest CLI that preceded this design is deleted; commit `5c3de9f` has it.
 
 ## API rules (`apps/api`)
 

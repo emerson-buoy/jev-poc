@@ -1,115 +1,204 @@
-# Jev Triage Board
+# Jev Ticket Classifier POC
 
-A Kanban board for support tickets where TypeSafe AI's **Jev** decides the
-department, the urgency and whether a refund is being requested. Move a card
-into the Triaged column and the answers appear as badges, with the full
-probability breakdown one click away.
+A Kanban board for support tickets. Drag a ticket into the Triaged column and
+TypeSafe AI's **Jev** decides which department owns it, how urgent it is, and
+whether the customer is asking for a refund. Every answer comes with a
+probability distribution and a confidence, and you can see all of it on the
+card's detail panel.
 
-Monorepo with two apps:
+Jev is a System One model: it does not write text. It evaluates a fixed set of
+typed questions against a piece of state and returns calibrated answers. This
+POC is about making those answers visible and useful on a board.
 
-| App        | Stack                                                          | Port |
-| ---------- | -------------------------------------------------------------- | ---- |
-| `apps/web` | TanStack Start, React 19, TanStack Query, Tailwind 4, shadcn/ui | 3000 |
-| `apps/api` | FastAPI, SQLModel on SQLite, httpx, Python 3.13 via uv          | 8000 |
+## How it works
 
-The browser never talks to FastAPI directly. TanStack Query calls Start server
-functions, which call a client generated from the API's OpenAPI document.
+### The board
 
-## Quick start
+Four columns, one per workflow status: **New**, **Triaged**, **In progress**,
+**Done**. Cards move freely by drag and drop. New tickets arrive in New with
+no classification. The board seeds itself with ten sample tickets across all
+four columns on first start.
 
-Requirement: Docker. Nothing else is installed on your machine. No AI key
-needed: without one the API runs a deterministic mock triage and the board says
-so in a banner.
+### What Jev is asked
+
+Every triage sends the ticket's title and description as state, plus these
+three questions. The exact text lives in `apps/api/app/triage/questions.py`.
+
+**1. Department** (choice)
+
+> Which team should handle this support ticket?
+
+| Option | Criteria |
+| --- | --- |
+| `billing` | Payments, invoicing, refunds, billing disputes |
+| `technical` | Bugs, outages, errors, integration or product issues |
+| `general` | Anything else: account questions, feedback, unclear requests |
+
+**2. Urgency** (score, five ordered levels)
+
+> Rate how urgent this ticket is, weighing time pressure and harm to the
+> customer together. Level 1 means no time pressure and no harm. Level 5 means
+> an active outage, a customer blocked right now, or significant ongoing
+> financial or data harm.
+
+| Level | Criteria |
+| --- | --- |
+| 1 | No time pressure and no harm. Informational, cosmetic, or a question. |
+| 2 | Minor inconvenience with an easy workaround. No money or data at stake. |
+| 3 | Affecting some of the customer's work, or a small billing error or wrong charge. A workaround exists. |
+| 4 | Blocking part of the customer's work with no good workaround, or the customer is losing money, was charged for something they do not owe, or lost data. |
+| 5 | Active outage, the customer is blocked right now, or significant financial or data harm is ongoing. |
+
+Harm is part of the scale on purpose. A wrong charge blocks nothing, but it
+still deserves a fast response. Under a time-pressure-only rubric a "$500
+wrongly debited" ticket scored 2/5; under this one it scores 4/5, while
+outages, low-priority questions and medium bugs keep their levels.
+
+**3. Refund requested** (yes/no)
+
+> Is the customer explicitly asking for a refund?
+
+### How answers become the classification
+
+| Field on the card | Derived from |
+| --- | --- |
+| Department | Jev's chosen option, the one with the highest probability |
+| Urgency `N/5` | The level with the highest probability. The panel also shows the mean, Jev's probability-weighted position on the scale |
+| Refund | Jev's probability of "yes", flagged when it is 0.5 or above |
+| Confidence | Jev's per-question confidence, shown in the panel when the provider returns it |
+| Provider | Which backend answered: `typesafe`, `jev` (gateway), `mock` or `seed` |
+
+The full probability distribution for each question is stored with the
+ticket and drawn as bars in the detail panel.
+
+### Rules of the board
+
+- **Triage runs when a card enters Triaged** without an active result. If
+  the provider fails, the move is rejected, the card snaps back and a toast
+  explains why. A card in Triaged always has a result.
+- **Moving a card back to New discards its triage.** The result and any
+  human override go to a history table and are never consulted again. The
+  card reads "Not triaged, 1 discarded" and the panel lists past results
+  collapsed under "Previous triages". Dragging it into Triaged again asks
+  Jev again.
+- **Re-triage** from the panel asks Jev again and archives the result it
+  replaces.
+- **Override.** The panel's department select stores a human decision next
+  to Jev's suggestion. The card shows the human choice with a `*`. Jev's
+  original answer stays visible.
+- **Forward moves** between Triaged, In progress and Done never touch the
+  result.
+
+### Mock mode
+
+Without an API key the backend runs a deterministic keyword mock that
+returns the same shape of answer, with synthesized probabilities, so the
+board behaves identically. A banner on the board says so, and every result
+records which provider produced it. It is a stand-in for demos and tests,
+not a classifier.
+
+## Running locally
+
+Requirement: Docker. Nothing is installed on your machine.
 
 ```bash
 ./run.sh
 ```
 
-It builds both images and starts the API on :8000 and the board on :3000,
-the same as `docker compose up --build`. Ctrl-C stops them. Open
-http://localhost:3000. The API seeds ten sample tickets across all four
-columns on first start, stored in the `api-data` volume.
+This builds both images and starts the API on http://localhost:8000 and the
+board on http://localhost:3000. Ctrl-C stops them. Data lives in the
+`api-data` Docker volume; `docker compose down -v` resets it.
 
-To use the real model, copy `apps/api/.env.example` to `apps/api/.env` and set
-either `TYPESAFE_API_KEY` (a TypeSafe AI account, calls Jev directly) or
-`AI_GATEWAY_API_KEY` (Vercel AI Gateway). The provider switches automatically,
-preferring TypeSafe when both are set. See `apps/api/README.md` for every
-variable.
+To use the real model, create `apps/api/.env` from `apps/api/.env.example`
+and set one of:
 
-## Docker
+| Variable | Effect |
+| --- | --- |
+| `TYPESAFE_API_KEY` | Calls Jev directly at TypeSafe. Preferred when both are set. |
+| `AI_GATEWAY_API_KEY` | Calls Jev through Vercel AI Gateway. |
 
-`run.sh` is `docker compose up --build` with a few checks. The API reads
-`apps/api/.env` if present, so a `TYPESAFE_API_KEY` there switches it to live
-Jev; without one it runs the mock. SQLite lives in the `api-data` volume and
-survives restarts. `docker compose down -v` removes it.
+With neither, the mock runs. `TRIAGE_PROVIDER=typesafe|jev|mock` forces a
+provider. The API's interactive docs are at http://localhost:8000/docs.
 
-Images: the API is Python 3.13 with uv, dependencies from `uv.lock`, no dev
-tools. The web image builds the Start app with pnpm 11.1.0 pinned through
-corepack and ships only the nitro server output on `node:22-alpine`.
+## Technical details
 
-## How it works
+Two apps in one repository. The browser never talks to the API directly.
 
-- **Columns** are workflow status: New, Triaged, In progress, Done. Cards move
-  freely between them by drag and drop.
-- **Triage runs** when a card enters Triaged without an active result. The API
-  asks three typed questions about the ticket: a department choice, a
-  five-level urgency score and a refund boolean. If the provider fails, the
-  move is rejected and the card snaps back with a toast.
-- **Moving a card back to New discards its triage.** The result and any human
-  override go to a history table and the card reads "Not triaged, 1 discarded".
-  Re-triage archives the result it replaces the same way. Discarded results
-  are never consulted again; the detail panel lists them collapsed under
-  "Previous triages".
-- **Card badges** show the effective department, urgency level out of five and
-  a Refund tag. A `*` marks a department overridden by a person.
-- **Detail panel** (click a card) shows the description, the probability
-  distribution for every question, the provider's confidence, which provider
-  answered, a department select that stores a human override next to Jev's
-  suggestion, and Re-triage and Delete buttons.
-- **Providers.** `typesafe` calls Jev at TypeSafe's own endpoint, `jev` calls
-  it through Vercel AI Gateway, and `mock` uses keyword heuristics with
-  synthesized probabilities so the board behaves the same without a key. Every
-  result records which provider answered.
+```
+Browser  ->  TanStack Query  ->  Start server functions  ->  generated client  ->  FastAPI  ->  Jev
+```
 
-## Developing
+**`apps/api`**: FastAPI on Python 3.13, SQLModel on SQLite, httpx. Managed
+with uv. The triage logic is a port with three adapters:
 
-Running is Docker only. Working on the code uses the toolchains directly:
-Node 20+ with pnpm 11.1.0 (corepack) and [uv](https://docs.astral.sh/uv/).
+- `app/triage/port.py`: the contract every provider implements.
+- `app/triage/typesafe.py`: TypeSafe's `POST /v1/systemone`. Their wire format
+  calls the yes/no type `noul` and returns a confidence per answer.
+- `app/triage/jev.py`: Vercel AI Gateway's `POST /v1/evaluate`, AI SDK naming.
+- `app/triage/mock.py`: keyword heuristics.
+- `app/triage/service.py`: turns any provider's answer into the stored result
+  (argmax level, mean, refund threshold, provider, timestamp).
+- `app/triage/factory.py`: picks the provider from the environment at startup.
+
+Endpoints: `GET /meta`, `GET|POST /tickets`, `GET|PATCH|DELETE /tickets/{id}`,
+`POST /tickets/{id}/move`, `POST /tickets/{id}/triage`. See
+`apps/api/README.md`.
+
+**`apps/web`**: TanStack Start with React 19, TanStack Router and Query,
+Tailwind 4, shadcn/ui, Atlassian's pragmatic-drag-and-drop. Server functions
+in `src/server/tickets.ts` wrap a client generated from the API's OpenAPI
+document with `@hey-api/openapi-ts`. Query options and mutations, including
+the optimistic move with rollback, live in `src/lib/queries.ts`. See
+`apps/web/README.md`.
+
+**Docker**: `apps/api/Dockerfile` (uv image, healthcheck on `/meta`, SQLite
+volume), `apps/web/Dockerfile` (built from the repo root, ships the nitro
+server output), `docker-compose.yml` wiring web to api.
+
+**Developing** (toolchains on the host: Node 20+, pnpm 11.1.0, uv):
 
 ```bash
 pnpm install && uv sync --directory apps/api
-pnpm dev             # both dev servers with hot reload, outside Docker
-pnpm test            # pytest then vitest
+pnpm dev             # both dev servers with hot reload
+pnpm test            # pytest then vitest, no network
 pnpm lint            # ruff then eslint
-pnpm export:openapi  # apps/api/openapi.json from the FastAPI app
-pnpm generate:client # apps/web/src/lib/api/generated from openapi.json
+pnpm export:openapi  # regenerate apps/api/openapi.json after an API change
+pnpm generate:client # regenerate the web client from it
 ```
 
-Change a route or schema in the API, then run the last two in that order.
+`CLAUDE.md` holds the working rules for this repo and `docs/context.md` the
+decisions with their reasons.
 
-## Layout
+## References
 
-```
-apps/
-  api/                 FastAPI app; see apps/api/README.md
-    app/triage/        Triage port, Jev and mock adapters, mapping service
-    app/routers/       /tickets and /meta
-    tests/             pytest, runs against the mock provider
-    openapi.json       Exported contract consumed by the web app
-  web/                 TanStack Start app; see apps/web/README.md
-    src/server/        Server functions wrapping the generated client
-    src/lib/           Queries, board helpers, generated client
-    src/components/    Board, column, card, detail panel, dialogs
-    src/routes/        File-based routes
-docker-compose.yml     Both services, API volume, healthcheck ordering
-CLAUDE.md              Rules and conventions for this repo
-docs/context.md        Full project context: history, decisions, wire formats, gotchas
-docs/original-spec.md  The spec the first version was built from
-TODO.md                Deferred work
-```
+**Jev and TypeSafe AI**
+- TypeSafe docs: https://docs.typesafe.ai/
+- HTTP API reference (System One endpoint, request and response shapes): https://docs.typesafe.ai/api
+- System One concept: https://docs.typesafe.ai/concepts/system-one
+- Models: https://docs.typesafe.ai/models
+- Python SDK (not used here, plain HTTP instead): https://docs.typesafe.ai/sdk/python
+- Launch coverage: https://www.marktechpost.com/2026/09/19/typesafe-ai-releases-jev/
 
-## History
+**Vercel AI Gateway route**
+- Evaluation modality: https://vercel.com/docs/ai-gateway/modalities/evaluation
+- TypeSafe-compatible endpoint: https://vercel.com/docs/ai-gateway/sdks-and-apis/typesafe
+- AI SDK `experimental_evaluate` reference: https://ai-sdk.dev/docs/reference/ai-sdk-core/evaluate
 
-The first version of this repo was a NestJS CLI that triaged the same tickets
-through the AI SDK's `experimental_evaluate`. It lives in git history at
-commit `5c3de9f`.
+**This app's API**
+- Swagger UI when running: http://localhost:8000/docs
+- ReDoc when running: http://localhost:8000/redoc
+- Committed OpenAPI document: `apps/api/openapi.json`
+
+**Stack**
+- FastAPI: https://fastapi.tiangolo.com/
+- SQLModel: https://sqlmodel.tiangolo.com/
+- uv: https://docs.astral.sh/uv/
+- TanStack Start: https://tanstack.com/start/latest
+- TanStack Query: https://tanstack.com/query/latest
+- @hey-api/openapi-ts: https://heyapi.dev/openapi-ts/get-started
+- pragmatic-drag-and-drop: https://atlassian.design/components/pragmatic-drag-and-drop/about
+- shadcn/ui: https://ui.shadcn.com/
+- Tailwind CSS: https://tailwindcss.com/docs
+
+**Self-hosted stand-in for Jev** (not used; Jev has no public weights)
+- Jeff, an MIT server speaking the same System One contract: https://github.com/logan-markewich/jeff

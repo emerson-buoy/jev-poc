@@ -1,8 +1,8 @@
 # Project context
 
 Everything a new engineer or agent needs that is not obvious from the code.
-Written 2026-09-21 at the end of the first build day. `CLAUDE.md` holds the
-rules; this file holds the story, the facts and the reasoning.
+`CLAUDE.md` holds the rules; this file holds the decisions, the facts and the
+reasoning behind the current state. Past states live in git.
 
 ## What this is
 
@@ -17,19 +17,10 @@ Owner: Emerson Demetrio. Repo: github.com/emerson-buoy/jev-ticket-classifier.
 
 ## History
 
-1. **NestJS CLI (commit `5c3de9f`).** Built from a written spec
-   (`docs/original-spec.md`): a TypeScript CLI calling Jev through the AI SDK's
-   `experimental_evaluate` via Vercel AI Gateway. Ports and adapters in the
-   Nest IoC container, 33 Vitest tests. Never ran live: no gateway key.
-2. **Rescope to a board (commit `e99bafe`).** Same day, Emerson rescoped to a
-   monorepo: TanStack Start UI plus FastAPI backend. The Nest code was deleted
-   from the tree and lives only in history.
-3. **History and TypeSafe provider (commit `59878c9`).** Moving a card back to
-   New archives its triage. A direct TypeSafe adapter was added once Emerson
-   said he had a TypeSafe account, and Jev was verified live through it.
-4. **Rename.** Repo and folder renamed from `jev-poc` to
-   `jev-ticket-classifier`. Package names and UI titles still say "Jev Triage
-   Board" and were left as is on purpose.
+Git history is the record. The short version: a CLI from a written
+spec, rescoped the same day to this board, then triage history, the direct
+TypeSafe provider, Docker, and a harm-aware urgency rubric. This document
+describes the current state only.
 
 ## Decisions and why
 
@@ -58,8 +49,8 @@ you want to change one, it is a product decision, not a refactor.
 | Realtime | Deferred to `TODO.md`; Query refetches on focus and after mutations | Emerson: "hmmm add to TODO" |
 | Urgency rubric | Time pressure and harm weighed together; wrong charges and data loss reach level 4 | A "$500 wrongly debited" ticket scored 2/5 under the original time-pressure-only rubric; Emerson chose to fold harm in rather than add a fourth question |
 
-Earlier, for the Nest CLI, he chose Nest defaults over bespoke setup and
-said "this is a POC anyway". He prefers framework conventions for POCs.
+He prefers framework conventions over bespoke setup for POCs ("this is a
+POC anyway").
 
 ## Providers and wire formats
 
@@ -191,8 +182,8 @@ interceptor. Do not pass `headers=` per call.
 ## Open items
 
 See `TODO.md`: auto-triage on create, realtime updates, gateway provider live
-check. Naming is inconsistent after the rename (package `jev-triage-board`,
-API `jev-triage-api`, UI title "Jev Triage Board") and was left deliberately.
+check. Package names (`jev-triage-board`, `jev-triage-api`) and the UI title
+"Jev Triage Board" predate the repo name and were left as is.
 
 ## Working with Emerson
 
