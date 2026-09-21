@@ -30,7 +30,9 @@ A Kanban board (`apps/web`, TanStack Start) backed by a FastAPI service
 - Moving a card into New discards the active triage: the result and the
   human override are copied to `TriageRecord` (reason `moved_to_new`) and
   cleared on the ticket, so re-entering Triaged runs triage again. Re-triage
-  archives the replaced result with reason `retriaged`. History is returned
+  archives the replaced result with reason `retriaged`; triggered on a card
+  in New it also moves the card to Triaged, so New never holds a result.
+  Cards in later columns keep their column. History is returned
   on every ticket as `history`, newest first, and is display-only: nothing
   reads it for decisions. The detail panel shows it collapsed.
 - Department override is a human decision stored beside Jev's suggestion.

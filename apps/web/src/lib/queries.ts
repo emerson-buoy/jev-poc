@@ -61,7 +61,7 @@ export function useRetriage() {
   return useMutation({
     mutationFn: (data: { id: number }) => retriage({ data }),
     onSuccess: (ticket: TicketRead) =>
-      toast.success(`Re-triaged by ${ticket.triage?.provider ?? 'unknown'}`),
+      toast.success(`Triaged by ${ticket.triage?.provider ?? 'unknown'}`),
     onError: (error) => toast.error('Triage failed', { description: error.message }),
     onSettled: invalidate,
   })
