@@ -175,9 +175,11 @@ The web build pins pnpm 11.1.0 via `packageManager` and corepack. Newer pnpm
 11.x enforces a one-day minimum release age on lockfile entries, and a
 same-day TanStack Query release made the build fail before the pin.
 
-HTTP auth in the Python adapters is set once on the `httpx.Client`
-(`headers=` and `base_url=`), the Python counterpart of a request
-interceptor. Do not pass `headers=` per call.
+HTTP for both Jev adapters goes through one `HttpEvaluator`
+(`app/triage/http.py`): one endpoint, auth set once on the `httpx.Client`,
+transport and HTTP errors mapped to `TriageError`, closed on app shutdown.
+Adapters only build the payload and parse the answers. Do not pass
+`headers=` per call.
 
 ## Open items
 

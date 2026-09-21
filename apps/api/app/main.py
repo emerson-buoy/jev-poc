@@ -33,6 +33,7 @@ def create_app(seed: bool = True) -> FastAPI:
             if added:
                 log.info("Seeded %d sample tickets", added)
         yield
+        app.state.triage_provider.close()
 
     app = FastAPI(
         title="Jev Triage API",
