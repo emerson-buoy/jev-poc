@@ -1,8 +1,12 @@
 from datetime import UTC, datetime
 
+import pytest
+
+from app.triage.circuit import CircuitBreaker
 from app.triage.port import (
     BooleanAnswer,
     ChoiceAnswer,
+    ProviderUnavailable,
     ScoreAnswer,
     TicketContent,
     TriageEvaluation,
@@ -35,10 +39,54 @@ def evaluation(**overrides) -> TriageEvaluation:
     return TriageEvaluation(**base)
 
 
+CONTENT = TicketContent(title="t", description="d")
+
+
 def triage(ev: TriageEvaluation):
     provider = StubProvider(ev)
-    service = TriageService(provider)
-    return service.triage(TicketContent(title="t", description="d")), provider
+    service = TriageService(provider, CircuitBreaker())
+    return service.triage(CONTENT), provider
+
+
+class UnavailableProvider:
+    name = "down"
+
+    def __init__(self) -> None:
+        self.calls = 0
+
+    def evaluate(self, content: TicketContent) -> TriageEvaluation:
+        self.calls += 1
+        raise ProviderUnavailable("down")
+
+
+def test_unavailable_counts_against_the_circuit_and_reraises():
+    circuit = CircuitBreaker(failure_threshold=2)
+    service = TriageService(UnavailableProvider(), circuit)
+    with pytest.raises(ProviderUnavailable):
+        service.triage(CONTENT)
+    assert circuit.state == "closed"
+    with pytest.raises(ProviderUnavailable):
+        service.triage(CONTENT)
+    assert circuit.state == "open"
+
+
+def test_open_circuit_skips_the_provider():
+    circuit = CircuitBreaker(failure_threshold=1)
+    provider = UnavailableProvider()
+    service = TriageService(provider, circuit)
+    with pytest.raises(ProviderUnavailable):
+        service.triage(CONTENT)
+    with pytest.raises(ProviderUnavailable):
+        service.triage(CONTENT)
+    assert provider.calls == 1
+    assert service.circuit_state == "open"
+
+
+def test_success_reports_a_closed_circuit():
+    provider = StubProvider(evaluation())
+    service = TriageService(provider, CircuitBreaker())
+    service.triage(CONTENT)
+    assert service.circuit_state == "closed"
 
 
 def test_passes_content_to_provider():

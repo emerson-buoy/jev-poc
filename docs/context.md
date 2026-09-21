@@ -181,6 +181,15 @@ transport and HTTP errors mapped to `TriageError`, closed on app shutdown.
 Adapters only build the payload and parse the answers. Do not pass
 `headers=` per call.
 
+Failures are typed (`ProviderUnavailable`, `ProviderRejected`,
+`MalformedResponse`). The evaluator retries only `ProviderUnavailable`, with
+jittered backoff under `TRIAGE_DEADLINE_SECONDS`. `TriageService` wraps every
+call in a `CircuitBreaker` on `app.state`: after
+`TRIAGE_CIRCUIT_FAILURES` consecutive unavailable answers the circuit opens
+for `TRIAGE_CIRCUIT_COOLDOWN_SECONDS`, calls fail fast with 503 and
+`Retry-After`, then one probe is let through. `GET /meta` reports `circuit`
+and the board shows a red banner while it is open.
+
 ## Open items
 
 See `TODO.md`: auto-triage on create, realtime updates, gateway provider live

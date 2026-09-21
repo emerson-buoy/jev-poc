@@ -4,9 +4,15 @@ from typing import Annotated
 from fastapi import Depends, Request
 from pydantic import BaseModel
 
-from app.triage.port import ScoreAnswer, TicketContent, TriageProvider
+from app.triage.circuit import CircuitBreaker, CircuitState
+from app.triage.port import (
+    ProviderUnavailable,
+    ScoreAnswer,
+    TicketContent,
+    TriageError,
+    TriageProvider,
+)
 
-# P(true) at or above this counts as an explicit refund request.
 REFUND_THRESHOLD = 0.5
 
 
@@ -25,15 +31,20 @@ class TriageResult(BaseModel):
 
 
 class TriageService:
-    def __init__(self, provider: TriageProvider) -> None:
+    def __init__(self, provider: TriageProvider, circuit: CircuitBreaker) -> None:
         self._provider = provider
+        self._circuit = circuit
 
     @property
     def provider_name(self) -> str:
         return self._provider.name
 
+    @property
+    def circuit_state(self) -> CircuitState:
+        return self._circuit.state
+
     def triage(self, content: TicketContent) -> TriageResult:
-        evaluation = self._provider.evaluate(content)
+        evaluation = self._evaluate(content)
         return TriageResult(
             department=evaluation.department.choice,
             department_probabilities=evaluation.department.probabilities or {},
@@ -50,6 +61,19 @@ class TriageService:
             triaged_at=datetime.now(UTC),
         )
 
+    def _evaluate(self, content: TicketContent):
+        self._circuit.before_call()
+        try:
+            evaluation = self._provider.evaluate(content)
+        except ProviderUnavailable:
+            self._circuit.record_unavailable()
+            raise
+        except TriageError:
+            self._circuit.record_available()
+            raise
+        self._circuit.record_available()
+        return evaluation
+
 
 def _pick_level(urgency: ScoreAnswer) -> int:
     if not urgency.probabilities:
@@ -62,8 +86,15 @@ def get_provider(request: Request) -> TriageProvider:
     return request.app.state.triage_provider
 
 
-def get_triage_service(provider: Annotated[TriageProvider, Depends(get_provider)]) -> TriageService:
-    return TriageService(provider)
+def get_circuit(request: Request) -> CircuitBreaker:
+    return request.app.state.circuit
+
+
+def get_triage_service(
+    provider: Annotated[TriageProvider, Depends(get_provider)],
+    circuit: Annotated[CircuitBreaker, Depends(get_circuit)],
+) -> TriageService:
+    return TriageService(provider, circuit)
 
 
 TriageServiceDep = Annotated[TriageService, Depends(get_triage_service)]

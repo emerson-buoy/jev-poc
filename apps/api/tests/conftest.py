@@ -6,9 +6,10 @@ from sqlmodel import Session, SQLModel, create_engine
 from app.db import get_session
 from app.main import create_app
 from app.seed import seed_tickets
+from app.triage.circuit import CircuitBreaker
 from app.triage.mock import MockTriageProvider
 from app.triage.port import TriageProvider
-from app.triage.service import get_provider
+from app.triage.service import get_circuit, get_provider
 
 
 @pytest.fixture
@@ -32,7 +33,12 @@ def provider() -> TriageProvider:
 
 
 @pytest.fixture
-def client(engine, provider):
+def circuit() -> CircuitBreaker:
+    return CircuitBreaker()
+
+
+@pytest.fixture
+def client(engine, provider, circuit):
     app = create_app(seed=False)
 
     def override_session():
@@ -41,6 +47,7 @@ def client(engine, provider):
 
     app.dependency_overrides[get_session] = override_session
     app.dependency_overrides[get_provider] = lambda: provider
+    app.dependency_overrides[get_circuit] = lambda: circuit
     with Session(engine) as session:
         seed_tickets(session)
     with TestClient(app) as client:

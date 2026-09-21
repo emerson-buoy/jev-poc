@@ -143,6 +143,23 @@ the item says so.
       toast text).
     - Reported by Emerson on 2026-09-21: "today they dont".
 
+17. **Server-sent events for board freshness** (after 4)
+    - Two open boards do not see each other's moves; the deferred TODO items
+      "multi-user freshness" and "auto-triage on create" both need a push
+      channel, and the circuit state from item 4 only reaches the banner on
+      the next refetch.
+    - API: `GET /events` as an async generator with `text/event-stream`, an
+      in-process broadcaster (one asyncio queue per subscriber), publish
+      `ticket.updated` / `ticket.deleted` / `meta.changed` from the routers via
+      `call_soon_threadsafe`, heartbeat comment every 15 s. Single process
+      only; Postgres LISTEN or Redis would replace the broadcaster later.
+    - Web: the browser never calls FastAPI, so a Start server route at
+      `/api/events` pipes the upstream stream through. `useTicketEvents` opens
+      an `EventSource` and invalidates the affected query per event.
+    - Tests: API streams one event after a move through the test client; web
+      hook driven by a fake `EventSource`.
+    - Emerson on 2026-09-21: "i love the idea".
+
 ## Considered and not recommended
 
 - **Queue / background triage.** Contradicts "a card in Triaged always has a

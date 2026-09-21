@@ -32,6 +32,8 @@ Copy `.env.example` to `.env`. Every variable is optional.
 | `TRIAGE_DEADLINE_SECONDS`  | `10`                                        | Total budget for one triage, all attempts  |
 | `TRIAGE_CONNECT_TIMEOUT_SECONDS` | `3`                                   | Per attempt connect timeout                |
 | `TRIAGE_READ_TIMEOUT_SECONDS` | `8`                                      | Per attempt read timeout, capped by budget |
+| `TRIAGE_CIRCUIT_FAILURES`  | `5`                                         | Consecutive unavailable answers that open the circuit |
+| `TRIAGE_CIRCUIT_COOLDOWN_SECONDS` | `30`                                 | Seconds the circuit stays open before one probe |
 
 `auto` picks `typesafe` when a TypeSafe key is set, else `jev` when a gateway
 key is set, else `mock` with a warning. A forced provider without its key fails
@@ -42,7 +44,7 @@ so the app-level file wins.
 
 | Method   | Path                      | Behaviour                                                   |
 | -------- | ------------------------- | ----------------------------------------------------------- |
-| `GET`    | `/meta`                   | Active provider and whether it is the mock                  |
+| `GET`    | `/meta`                   | Active provider, whether it is the mock, circuit state      |
 | `GET`    | `/tickets`                | All tickets, oldest first                                   |
 | `POST`   | `/tickets`                | Create in `new`                                             |
 | `GET`    | `/tickets/{id}`           | One ticket                                                  |

@@ -31,6 +31,10 @@ export type MetaRead = {
      * Mock
      */
     mock: boolean;
+    /**
+     * Circuit
+     */
+    circuit: 'closed' | 'open' | 'half_open';
 };
 
 /**

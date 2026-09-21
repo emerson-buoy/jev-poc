@@ -22,6 +22,8 @@ class Settings(BaseSettings):
     triage_deadline_seconds: float = 10.0
     triage_connect_timeout_seconds: float = 3.0
     triage_read_timeout_seconds: float = 8.0
+    triage_circuit_failures: int = 5
+    triage_circuit_cooldown_seconds: float = 30.0
 
 
 @lru_cache

@@ -10,6 +10,7 @@ from app.config import get_settings
 from app.db import get_engine, init_db
 from app.routers import meta, tickets
 from app.seed import seed_tickets
+from app.triage.circuit import CircuitBreaker
 from app.triage.factory import build_provider
 
 log = logging.getLogger(__name__)
@@ -23,7 +24,12 @@ def operation_id(route: APIRoute) -> str:
 def create_app(seed: bool = True) -> FastAPI:
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
-        app.state.triage_provider = build_provider(get_settings())
+        settings = get_settings()
+        app.state.triage_provider = build_provider(settings)
+        app.state.circuit = CircuitBreaker(
+            failure_threshold=settings.triage_circuit_failures,
+            cooldown_seconds=settings.triage_circuit_cooldown_seconds,
+        )
         log.info("Triage provider: %s", app.state.triage_provider.name)
         if seed:
             engine = get_engine()
